@@ -32,14 +32,21 @@ def main():
         raise SystemExit("SDK metadata has no full mixin-tool commit")
 
     runtime = ROOT / "target/bundle/mixins/vape_rs/runtime.rs"
-    helper = ROOT / "mixins/vape_rs/adapters/current_tick.rs"
+    helpers = {
+        name: ROOT / "mixins/vape_rs/adapters" / f"current_{name}.rs"
+        for name in ("tick", "keys", "hud", "control_keys", "agent_keys")
+    }
     if not runtime.is_file():
         raise SystemExit("runtime payload missing; run `cargo run --offline -p xtask -- pack` first")
+    for helper in helpers.values():
+        if not helper.is_file():
+            raise SystemExit(f"native adapter missing: {helper.relative_to(ROOT)}")
     if OUTPUT.exists():
         shutil.rmtree(OUTPUT)
     (OUTPUT / "src/adapters").mkdir(parents=True)
     shutil.copyfile(runtime, OUTPUT / "src/runtime.rs")
-    shutil.copyfile(helper, OUTPUT / "src/adapters/current_tick.rs")
+    for name, helper in helpers.items():
+        shutil.copyfile(helper, OUTPUT / f"src/adapters/current_{name}.rs")
     (OUTPUT / "Cargo.toml").write_text(
         '[package]\nname = "mod-vape-rs"\nversion = "0.1.0"\nedition = "2024"\n\n'
         '[dependencies]\nhorizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }\n\n'
@@ -59,6 +66,33 @@ def main():
         'target = "horizon_client::game::Game<\'_>::tick"\nkind = "HEAD"\n'
         'helper = "src/adapters/current_tick.rs"\n'
         'bindings = [{ name = "game", ty = "&mut crate::game::Game<\'_>", value = "&mut *self" }]\n\n'
+        '[[native.mixin]]\nid = "control-key-names"\n'
+        'target = "horizon_client::game::control::key_code"\nkind = "HEAD"\n'
+        'cancellable = true\nhelper = "src/adapters/current_control_keys.rs"\n'
+        'bindings = [{ name = "name", ty = "&str", value = "name" }]\n\n'
+        '[[native.mixin]]\nid = "game-key-capture"\n'
+        'target = "horizon_client::game::play_input::Game::mapped_key"\nkind = "HEAD"\n'
+        'helper = "src/adapters/current_keys.rs"\n'
+        'bindings = [\n'
+        '  { name = "game", ty = "&mut crate::game::Game<\'_>", value = "&mut *self" },\n'
+        '  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },\n'
+        '  { name = "pressed", ty = "bool", value = "pressed" },\n'
+        '  { name = "repeat", ty = "bool", value = "repeat" },\n'
+        ']\n\n'
+        '[[native.mixin]]\nid = "agent-key-capture"\n'
+        'target = "horizon_client::game::control::Game<\'_>::control_key_down"\nkind = "HEAD"\n'
+        'helper = "src/adapters/current_agent_keys.rs"\n'
+        'bindings = [\n'
+        '  { name = "game", ty = "&mut crate::game::Game<\'_>", value = "&mut *self" },\n'
+        '  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },\n'
+        ']\n\n'
+        '[[native.mixin]]\nid = "client-hud"\n'
+        'target = "horizon_client::game::extras::Game<\'_>::draw_extras"\nkind = "HEAD"\n'
+        'helper = "src/adapters/current_hud.rs"\n'
+        'bindings = [\n'
+        '  { name = "game", ty = "&mut crate::game::Game<\'_>", value = "&mut *self" },\n'
+        '  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },\n'
+        ']\n\n'
         '[[native.module]]\nid = "vape-runtime"\n'
         'file = "crates/horizon-client/src/game.rs"\nname = "vape_rs"\n'
         'source = "src/runtime.rs"\n'

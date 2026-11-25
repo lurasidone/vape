@@ -2530,10 +2530,21 @@ The current-SDK client-tick adapter is now tracked at
 `mixins/vape_rs/adapters/current_tick.rs`. `tools/native_sdk_project.py`
 generates the disposable launcher project from the signed SDK's `sdk.json`
 after `cargo run --offline -p xtask -- pack`; no hand-edited probe manifest is
-needed. Rebuilt as `native-f1bb66f-122660d9e176` from that generated project,
-then reran the fresh-home smoke: **1,582 frames, 117 chunks, 2,268 meshed
-sections, a player, no error**, with the same runtime-ready and session logs.
-Evidence is under ignored `target/scenarios/sdk-nightly-vape-repro/`.
+needed. The generator also includes current-nightly adapters for the launcher
+control socket, F8/F9/F10 activation and HUD drawing. Rebuilt from the
+generated project as `native-f1bb66f-90227b67433c`.
+
+An interactive run in the separate fresh home
+`target/scenarios/sdk-nightly-hud-control/` loaded a generated single-player
+world, then used `horizon-ctl` to press F8, F9 and F10. Inspected captures show
+coordinates at F8, live FPS at F9, and both hidden after F10 panic. The log
+confirms the runtime initialized and entered the profile/world sessions, then
+recorded `panic`, `Coords disabled` and `FPS disabled`. The world loaded 117
+chunks; game and screenshots stayed under ignored `target/`. The earlier
+1,582-frame smoke remains under
+`target/scenarios/sdk-nightly-vape-repro/`.
 
 This does not port the existing gameplay hooks, HUD/UI or feature set to this
-SDK. Keep all feature rows and overall completion status unchanged.
+SDK. This HUD uses fixed positions and Horizon's bitmap font, without the full
+layout, styling, configuration or other module panels. Keep all feature rows
+and overall completion status unchanged.
