@@ -2,7 +2,7 @@ use super::Game;
 use crate::game::vape_rs::core::with_client;
 use crate::game::vape_rs::modules::render::{esp::Camera, storage_esp::Storage};
 use core::ops::ControlFlow;
-use horizon_client::gizmos::Line;
+use horizon_client_lib::gizmos::Line;
 
 /// StorageESP's containers: the host's rendered block entities (so ender
 /// chests and shulker boxes too) with each one's lid openness.
@@ -13,14 +13,18 @@ pub(crate) fn storage_blocks(game: &Game<'_>, partial: f32) -> Vec<(Storage, [i3
     let facts = game.res.facts();
     r.visible_block_entities(game.settings.chunk_fade)
         .filter_map(|&(pos, state)| {
-            let kind = Storage::from_block(&facts.get(horizon_world::registry::BlockStateId(state)).name)?;
+            let kind =
+                Storage::from_block(&facts.get(horizon_world::registry::BlockStateId(state)).name)?;
             Some((kind, pos, game.chest_lid(pos, partial)))
         })
         .collect()
 }
 
 /// Explosions' primed TNT at the partial tick (age `80 - fuse`).
-pub(crate) fn tnts(game: &Game<'_>, partial: f64) -> Vec<crate::game::vape_rs::modules::render::explosions::Tnt> {
+pub(crate) fn tnts(
+    game: &Game<'_>,
+    partial: f64,
+) -> Vec<crate::game::vape_rs::modules::render::explosions::Tnt> {
     game.tnts
         .iter()
         .map(|t| crate::game::vape_rs::modules::render::explosions::Tnt {
@@ -69,7 +73,10 @@ static SEARCH: std::sync::Mutex<SearchScan> = std::sync::Mutex::new(SearchScan {
 /// Chunks scanned per frame.
 const SEARCH_CHUNKS_PER_FRAME: usize = 2;
 
-fn search_found(game: &Game<'_>, query: Option<crate::game::vape_rs::modules::render::search::Query>) -> Vec<([i32; 3], String)> {
+fn search_found(
+    game: &Game<'_>,
+    query: Option<crate::game::vape_rs::modules::render::search::Query>,
+) -> Vec<([i32; 3], String)> {
     let Ok(mut scan) = SEARCH.lock() else {
         return Vec::new();
     };
@@ -90,11 +97,15 @@ fn search_found(game: &Game<'_>, query: Option<crate::game::vape_rs::modules::re
         scan.pending.clear();
         scan.query = Some(query.clone());
     }
-    let (px, pz) = (player.position.x.floor() as i32, player.position.z.floor() as i32);
+    let (px, pz) = (
+        player.position.x.floor() as i32,
+        player.position.z.floor() as i32,
+    );
     let (cx, cz) = (px >> 4, pz >> 4);
     let reach = (query.range + 15) >> 4;
     let in_range = |(x, z): (i32, i32)| (x - cx).abs() <= reach && (z - cz).abs() <= reach;
-    scan.found.retain(|&k, _| in_range(k) && game.world.chunks.contains_key(&k));
+    scan.found
+        .retain(|&k, _| in_range(k) && game.world.chunks.contains_key(&k));
     if scan.pending.is_empty() {
         let mut next: Vec<(i32, i32)> = (-reach..=reach)
             .flat_map(|dx| (-reach..=reach).map(move |dz| (cx + dx, cz + dz)))
@@ -133,14 +144,30 @@ fn search_found(game: &Game<'_>, query: Option<crate::game::vape_rs::modules::re
                                 continue;
                             }
                             if query.only_caves {
-                                let open = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
-                                    .iter()
-                                    .any(|d| facts.get(game.world.block(x + d[0], y + d[1], z + d[2])).name.ends_with("air"));
+                                let open = [
+                                    [1, 0, 0],
+                                    [-1, 0, 0],
+                                    [0, 1, 0],
+                                    [0, -1, 0],
+                                    [0, 0, 1],
+                                    [0, 0, -1],
+                                ]
+                                .iter()
+                                .any(|d| {
+                                    facts
+                                        .get(game.world.block(x + d[0], y + d[1], z + d[2]))
+                                        .name
+                                        .ends_with("air")
+                                });
                                 if !open {
                                     continue;
                                 }
                             }
-                            let name = facts.get(state).name.trim_start_matches("minecraft:").to_owned();
+                            let name = facts
+                                .get(state)
+                                .name
+                                .trim_start_matches("minecraft:")
+                                .to_owned();
                             hits.push(([x, y, z], name));
                         }
                     }
@@ -155,7 +182,10 @@ fn search_found(game: &Game<'_>, query: Option<crate::game::vape_rs::modules::re
         .values()
         .flatten()
         .filter(|(p, _)| {
-            let (dx, dz) = (f64::from(p[0]) + 0.5 - player.position.x, f64::from(p[2]) + 0.5 - player.position.z);
+            let (dx, dz) = (
+                f64::from(p[0]) + 0.5 - player.position.x,
+                f64::from(p[2]) + 0.5 - player.position.z,
+            );
             dx * dx + dz * dz <= range * range
         })
         .cloned()
@@ -167,7 +197,11 @@ fn search_found(game: &Game<'_>, query: Option<crate::game::vape_rs::modules::re
 pub(crate) type InFlight = (&'static str, [f64; 3], [f64; 3], [f64; 3], bool, bool);
 
 fn in_water(game: &Game<'_>, p: [f64; 3]) -> bool {
-    let state = game.world.block(p[0].floor() as i32, p[1].floor() as i32, p[2].floor() as i32);
+    let state = game.world.block(
+        p[0].floor() as i32,
+        p[1].floor() as i32,
+        p[2].floor() as i32,
+    );
     game.res.facts().get(state).fluid == horizon_client::blocks::Fluid::Water
 }
 
@@ -180,18 +214,41 @@ pub(crate) fn in_flight(game: &Game<'_>) -> Vec<InFlight> {
         .creatures
         .projectiles
         .iter()
-        .map(|p| (p.kind.id(), v(p.position), v(p.previous), v(p.velocity), p.touching_water, p.stuck))
+        .map(|p| {
+            (
+                p.kind.id(),
+                v(p.position),
+                v(p.previous),
+                v(p.velocity),
+                p.touching_water,
+                p.stuck,
+            )
+        })
         .collect();
     out.extend(game.tridents.iter().map(|t| {
         let at = v(t.position);
-        ("minecraft:trident", at, v(t.previous), v(t.velocity), in_water(game, at), t.in_ground)
+        (
+            "minecraft:trident",
+            at,
+            v(t.previous),
+            v(t.velocity),
+            in_water(game, at),
+            t.in_ground,
+        )
     }));
     for (kind, position, velocity) in game.potions.thrown_entities() {
         if kind == "minecraft:experience_bottle" {
             continue;
         }
         let (at, m) = (v(position), v(velocity));
-        out.push((kind, at, [0, 1, 2].map(|i| at[i] - m[i]), m, in_water(game, at), false));
+        out.push((
+            kind,
+            at,
+            [0, 1, 2].map(|i| at[i] - m[i]),
+            m,
+            in_water(game, at),
+            false,
+        ));
     }
     out
 }
@@ -211,7 +268,12 @@ fn targets(game: &Game<'_>) -> Vec<crate::game::vape_rs::modules::render::projec
         })
         .collect();
     if let Some(host) = &game.lan {
-        for g in host.hub.guests.iter().filter(|g| host.hub.here(g) && g.loaded && !g.dead) {
+        for g in host
+            .hub
+            .guests
+            .iter()
+            .filter(|g| host.hub.here(g) && g.loaded && !g.dead)
+        {
             let min = [g.position[0] - 0.3, g.position[1], g.position[2] - 0.3];
             out.push((min, [min[0] + 0.6, min[1] + 1.8, min[2] + 0.6]));
         }
@@ -221,8 +283,11 @@ fn targets(game: &Game<'_>) -> Vec<crate::game::vape_rs::modules::render::projec
 
 /// Projectiles' paths, simulated once a tick (the projectiles only move per
 /// tick): the tick's flights and their lines.
-static PROJECTILE_PATHS: std::sync::Mutex<(i64, Vec<InFlight>, Vec<crate::game::vape_rs::modules::render::world::Line>)> =
-    std::sync::Mutex::new((i64::MIN, Vec::new(), Vec::new()));
+static PROJECTILE_PATHS: std::sync::Mutex<(
+    i64,
+    Vec<InFlight>,
+    Vec<crate::game::vape_rs::modules::render::world::Line>,
+)> = std::sync::Mutex::new((i64::MIN, Vec::new(), Vec::new()));
 
 fn projectile_lines(
     game: &Game<'_>,
@@ -240,7 +305,14 @@ fn projectile_lines(
     let flights: Vec<Flight> = flying
         .iter()
         .filter_map(|&(id, position, previous, velocity, in_water, stuck)| {
-            Some(Flight { kind: Kind::from_entity(id)?, position, previous, velocity, in_water, stuck })
+            Some(Flight {
+                kind: Kind::from_entity(id)?,
+                position,
+                previous,
+                velocity,
+                in_water,
+                stuck,
+            })
         })
         .collect();
     let lines = if flights.is_empty() {
@@ -248,7 +320,9 @@ fn projectile_lines(
     } else {
         let targets = targets(game);
         let bottom = f64::from(game.world.bottom_y());
-        with_client(client, |runtime| runtime.projectile_lines(&flights, &targets, bottom, block))
+        with_client(client, |runtime| {
+            runtime.projectile_lines(&flights, &targets, bottom, block)
+        })
     };
     *cache = (game.world.game_time, flying, lines.clone());
     lines
@@ -262,8 +336,11 @@ pub(crate) fn overlay_target(game: &Game<'_>) -> Vec<[f64; 6]> {
         return Vec::new();
     };
     let eye = game.eye_position().unwrap_or_default();
-    let d = (0..3).map(|a| (hit.point[a] - eye[a]).powi(2)).sum::<f64>().sqrt();
-    if game.mob_hit().is_some_and(|(_, m)| m < d) {
+    let d = (0..3)
+        .map(|a| (hit.point[a] - eye[a]).powi(2))
+        .sum::<f64>()
+        .sqrt();
+    if game.mob_hit().is_some_and(|(_, m, _)| m < d) {
         return Vec::new();
     }
     game.outline_boxes(hit.pos)
@@ -271,10 +348,17 @@ pub(crate) fn overlay_target(game: &Game<'_>) -> Vec<[f64; 6]> {
 
 pub(crate) fn fishing_line(game: &Game<'_>, alpha: f64, size: [u32; 2]) -> ControlFlow<Vec<Line>> {
     let client = crate::game::vape_rs::core::client().clone();
-    let (storage_on, entities_on, scene_on, (explosions_on, overlay_on), epoch) = with_client(&client, |runtime| {
-        let (s, e) = runtime.world_line_sources();
-        (s, e, runtime.scene_active(), runtime.depth_active(), runtime.session().epoch())
-    });
+    let (storage_on, entities_on, scene_on, (explosions_on, overlay_on), epoch) =
+        with_client(&client, |runtime| {
+            let (s, e) = runtime.world_line_sources();
+            (
+                s,
+                e,
+                runtime.scene_active(),
+                runtime.depth_active(),
+                runtime.session().epoch(),
+            )
+        });
     if !entities_on {
         crate::game::glowing::vape_esp_outline::set(Default::default());
     }
@@ -295,7 +379,9 @@ pub(crate) fn fishing_line(game: &Game<'_>, alpha: f64, size: [u32; 2]) -> Contr
         before.z + (now.z - before.z) * t,
     );
     let (yaw, pitch) = (game.yaw, game.pitch);
-    let own = game.hook_position(alpha).zip(game.rod_hand_position(alpha, size));
+    let own = game
+        .hook_position(alpha)
+        .zip(game.rod_hand_position(alpha, size));
     let width = horizon_client::gfx::outline_width(size[0]);
     let mut lines = Vec::new();
     for (hook, hand) in own.into_iter().chain(game.remote_hook_ends(alpha)) {
@@ -304,9 +390,18 @@ pub(crate) fn fishing_line(game: &Game<'_>, alpha: f64, size: [u32; 2]) -> Contr
             let y = offset.y * (a * a + a) * 0.5 + 0.25;
             hook + glam::Vec3::new(offset.x * a, y, offset.z * a).as_dvec3()
         };
-        lines.extend((0..16).map(|i| Line { start: point(i as f32 / 16.0).to_array(), end: point((i + 1) as f32 / 16.0).to_array(), color: 0xff00_0000, width }));
+        lines.extend((0..16).map(|i| Line {
+            start: point(i as f32 / 16.0).to_array(),
+            end: point((i + 1) as f32 / 16.0).to_array(),
+            color: 0xff00_0000,
+            width,
+        }));
     }
-    let storage = if storage_on { storage_blocks(game, alpha as f32) } else { Vec::new() };
+    let storage = if storage_on {
+        storage_blocks(game, alpha as f32)
+    } else {
+        Vec::new()
+    };
     let entities = if entities_on {
         crate::game::vape_combat::snapshot(game, epoch, None)
     } else {
@@ -314,7 +409,12 @@ pub(crate) fn fishing_line(game: &Game<'_>, alpha: f64, size: [u32; 2]) -> Contr
     };
     if entities_on {
         let outlines = with_client(&client, |runtime| runtime.esp_outlines(&entities));
-        crate::game::glowing::vape_esp_outline::set(outlines.into_iter().map(|(id, rgb)| (id as u32, rgb)).collect());
+        crate::game::glowing::vape_esp_outline::set(
+            outlines
+                .into_iter()
+                .map(|(id, rgb)| (id as u32, rgb))
+                .collect(),
+        );
     }
     let (y, p) = (f64::from(yaw).to_radians(), f64::from(pitch).to_radians());
     let camera = Camera {
@@ -325,19 +425,30 @@ pub(crate) fn fishing_line(game: &Game<'_>, alpha: f64, size: [u32; 2]) -> Contr
     };
     // Trajectories: the held item and how long it has been used.
     let held = game.inventory.get(game.selected).and_then(Option::as_ref);
-    let use_ticks = game.using.filter(|(slot, _)| *slot == game.selected).map(|(_, t)| t);
+    let use_ticks = game
+        .using
+        .filter(|(slot, _)| *slot == game.selected)
+        .map(|(_, t)| t);
     let launch = held.and_then(|stack| {
         use crate::game::vape_rs::modules::render::trajectories::Loaded;
         let view = horizon_client::item_render::stack_view(stack);
-        let loaded = match view.patch.get("minecraft:charged_projectiles").and_then(|v| v.as_ref()?.as_array()) {
-            Some(p) if p.iter().any(|t| t.to_string().contains("firework_rocket")) => Loaded::Firework,
+        let loaded = match view
+            .patch
+            .get("minecraft:charged_projectiles")
+            .and_then(|v| v.as_ref()?.as_array())
+        {
+            Some(p) if p.iter().any(|t| t.to_string().contains("firework_rocket")) => {
+                Loaded::Firework
+            }
             Some(p) if !p.is_empty() => Loaded::Arrow,
             _ => Loaded::Empty,
         };
         let on_ground = game.player.as_ref().is_some_and(|p| p.ground.on_ground);
         let movement = game.known_player_movement();
-        with_client(&client, |runtime| runtime.trajectory_launch(&stack.item, use_ticks, loaded))
-            .map(|l| l.with_shooter([movement.x, movement.y, movement.z], on_ground))
+        with_client(&client, |runtime| {
+            runtime.trajectory_launch(&stack.item, use_ticks, loaded)
+        })
+        .map(|l| l.with_shooter([movement.x, movement.y, movement.z], on_ground))
     });
     // The host's block clip for a segment: the hit point and face normal.
     let clip = |a: [f64; 3], b: [f64; 3]| {
@@ -346,19 +457,35 @@ pub(crate) fn fishing_line(game: &Game<'_>, alpha: f64, size: [u32; 2]) -> Contr
         if length < 1e-9 {
             return None;
         }
-        game.clip_ray(a, d.map(|v| v / length), length).map(|hit| (hit.point, hit.face))
+        game.clip_ray(a, d.map(|v| v / length), length)
+            .map(|hit| (hit.point, hit.face))
     };
     let mut block = |a: [f64; 3], b: [f64; 3]| clip(a, b).map(|(point, _)| point);
     let mut faced = clip;
-    let trajectory = launch.map(|l| (l, &mut faced as crate::game::vape_rs::modules::render::trajectories::BlockClip<'_>));
+    let trajectory = launch.map(|l| {
+        (
+            l,
+            &mut faced as crate::game::vape_rs::modules::render::trajectories::BlockClip<'_>,
+        )
+    });
     let (extra, query, props_wanted) = with_client(&client, |runtime| {
-        (runtime.world_lines(&camera, &entities, &storage, trajectory), runtime.search_query(), runtime.props_wanted())
+        (
+            runtime.world_lines(&camera, &entities, &storage, trajectory),
+            runtime.search_query(),
+            runtime.props_wanted(),
+        )
     });
     let mut extra = extra;
     if scene_on {
         let found = search_found(game, query);
-        let props = if props_wanted { falling_blocks(game, alpha) } else { Vec::new() };
-        extra.extend(with_client(&client, |runtime| runtime.scene_lines(&found, &props)));
+        let props = if props_wanted {
+            falling_blocks(game, alpha)
+        } else {
+            Vec::new()
+        };
+        extra.extend(with_client(&client, |runtime| {
+            runtime.scene_lines(&found, &props)
+        }));
         extra.extend(projectile_lines(game, &client, &mut block));
     } else {
         search_found(game, None);
@@ -374,10 +501,25 @@ pub(crate) fn fishing_line(game: &Game<'_>, alpha: f64, size: [u32; 2]) -> Contr
     // Explosions' blast rings and Block Overlay's outline stay depth-tested
     // (the reference keeps the depth test on).
     if explosions_on || overlay_on {
-        let tnt = if explosions_on { tnts(game, alpha) } else { Vec::new() };
-        let target = if overlay_on { overlay_target(game) } else { Vec::new() };
-        let depth = with_client(&client, |runtime| runtime.depth_lines(&tnt, alpha as f32, &target));
-        lines.extend(depth.into_iter().map(|l| Line { start: l.start.0, end: l.end.0, color: l.color, width: l.width }));
+        let tnt = if explosions_on {
+            tnts(game, alpha)
+        } else {
+            Vec::new()
+        };
+        let target = if overlay_on {
+            overlay_target(game)
+        } else {
+            Vec::new()
+        };
+        let depth = with_client(&client, |runtime| {
+            runtime.depth_lines(&tnt, alpha as f32, &target)
+        });
+        lines.extend(depth.into_iter().map(|l| Line {
+            start: l.start.0,
+            end: l.end.0,
+            color: l.color,
+            width: l.width,
+        }));
     }
     ControlFlow::Break(lines)
 }

@@ -16,6 +16,11 @@ OUTPUT = ROOT / "target/current-native-mod"
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("sdk_json", type=Path, help="sdk.json from the signed SDK release")
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="generate the full gameplay-hook candidate instead of the HUD smoke project",
+    )
     args = parser.parse_args()
 
     try:
@@ -30,6 +35,30 @@ def main():
         raise SystemExit("SDK metadata has no full Horizon commit")
     if len(mixins) != 40 or any(c not in "0123456789abcdef" for c in mixins):
         raise SystemExit("SDK metadata has no full mixin-tool commit")
+
+    runtime = ROOT / "target/bundle/mixins/vape_rs/runtime.rs"
+    if args.full:
+        if commit != "f1bb66f353cf67f2aa4665293fc75c8d91186fc7" or mixins != "e59da9094f0c2fdda6c627fe9eff22dec6a906f0":
+            raise SystemExit("the full candidate manifest is pinned to the signed Nov 22 SDK")
+        if not runtime.is_file():
+            raise SystemExit("runtime payload missing; run `cargo run --offline -p xtask -- pack` first")
+        if OUTPUT.exists():
+            shutil.rmtree(OUTPUT)
+        (OUTPUT / "src").mkdir(parents=True)
+        shutil.copytree(ROOT / "mixins/vape_rs", OUTPUT / "src", dirs_exist_ok=True)
+        shutil.copyfile(runtime, OUTPUT / "src/runtime.rs")
+        (OUTPUT / "src/lib.rs").write_text(
+            "use mod_api::Hooks;\n\n#[derive(Default)]\nstruct VapeRs;\n\n"
+            "#[mod_api::horizon_mod]\nimpl Hooks for VapeRs {}\n"
+        )
+        shutil.copyfile(ROOT / "tools/current_native_full_manifest.toml", OUTPUT / "horizon-mod.toml")
+        (OUTPUT / "Cargo.toml").write_text(
+            '[package]\nname = "mod-vape-rs"\nversion = "0.1.0"\nedition = "2024"\n\n'
+            '[dependencies]\nhorizon-mod-api = { path = ".horizon/sdk/api/crates/horizon-mod-api" }\n\n'
+            '[workspace]\n'
+        )
+        print(OUTPUT)
+        return
 
     runtime = ROOT / "target/bundle/mixins/vape_rs/runtime.rs"
     helpers = {

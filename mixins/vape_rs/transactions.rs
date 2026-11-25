@@ -50,14 +50,16 @@ fn armor_values(info: &horizon_client::items::ItemInfo) -> (f32, f32) {
         .iter()
         // Vanilla armor modifiers name the piece's own slot group (`head`,
         // `chest`...), not `armor`; count every group that applies when worn.
-        .filter(|(_, _, _, _, group)| {
-            group == "armor" || group == "any" || info.equip_slot.as_deref() == Some(group)
+        .filter(|modifier| {
+            modifier.slot == "armor"
+                || modifier.slot == "any"
+                || info.equip_slot.as_deref() == Some(modifier.slot.as_str())
         })
-        .fold((0.0, 0.0), |(armor, toughness), (attribute, _, amount, _, _)| {
-            match attribute.as_str() {
-                "minecraft:armor" | "armor" => (armor + *amount as f32, toughness),
+        .fold((0.0, 0.0), |(armor, toughness), modifier| {
+            match modifier.attribute.as_str() {
+                "minecraft:armor" | "armor" => (armor + modifier.amount as f32, toughness),
                 "minecraft:armor_toughness" | "armor_toughness" => {
-                    (armor, toughness + *amount as f32)
+                    (armor, toughness + modifier.amount as f32)
                 }
                 _ => (armor, toughness),
             }
@@ -165,16 +167,13 @@ fn meta(
                 }
             }));
         }
-        effects.extend(
-            stack
-                .custom_potion_effects()
-                .into_iter()
-                .map(|(e, duration, amplifier)| PotionEffect {
-                    id: unprefixed(&e),
-                    amplifier,
-                    duration,
-                }),
-        );
+        effects.extend(stack.custom_potion_effects().into_iter().map(
+            |(e, duration, amplifier)| PotionEffect {
+                id: unprefixed(&e),
+                amplifier,
+                duration,
+            },
+        ));
     }
     let block = info.and_then(|i| i.block);
     let items = game.res.items();
@@ -210,10 +209,7 @@ fn meta(
             .map(|line| line.plain())
             .collect(),
         effects,
-        thrown_potion: matches!(
-            id,
-            "minecraft:splash_potion" | "minecraft:lingering_potion"
-        ),
+        thrown_potion: matches!(id, "minecraft:splash_potion" | "minecraft:lingering_potion"),
         food: info.and_then(|i| i.food),
         block: block.is_some(),
         hardness: block.map(|state| game.res.facts().get(state).hardness),
@@ -231,13 +227,13 @@ fn meta(
         mainhand_modifiers: info.map_or(0.0, |i| {
             i.modifiers
                 .iter()
-                .filter(|(.., slot)| slot == "mainhand")
-                .map(|(_, _, amount, ..)| *amount as f32)
+                .filter(|modifier| modifier.slot == "mainhand")
+                .map(|modifier| modifier.amount as f32)
                 .sum()
         }),
         first_modifier: info
             .and_then(|i| i.modifiers.first())
-            .map_or(0.0, |(_, _, amount, ..)| *amount as f32),
+            .map_or(0.0, |modifier| modifier.amount as f32),
         tool: info.is_some_and(|i| i.tool_damage_per_block.is_some()),
     }
 }
@@ -389,7 +385,8 @@ pub fn submit(game: &mut Game<'_>, request: &Request) -> bool {
     if request.click == Click::Outside {
         // Slot -999: only the carried stack the planner saw may be dropped.
         return request.expected_carried.is_some()
-            && current.carried.as_ref().map(|i| &i.fingerprint) == request.expected_carried.as_ref()
+            && current.carried.as_ref().map(|i| &i.fingerprint)
+                == request.expected_carried.as_ref()
             && game.menu_ops(&[(None, 0, Input::Pickup)]);
     }
     if !current_matches(&current, request) {
@@ -421,9 +418,9 @@ fn current_matches(current: &Snapshot, request: &Request) -> bool {
     current.session == request.session
         && current.container_id == request.container_id
         && current.revision == request.revision
-        && current
-            .slot(request.slot)
-            .is_some_and(|slot| slot.item.as_ref().map(|i| &i.fingerprint) == request.expected.as_ref())
+        && current.slot(request.slot).is_some_and(|slot| {
+            slot.item.as_ref().map(|i| &i.fingerprint) == request.expected.as_ref()
+        })
         && current.carried.as_ref().map(|i| &i.fingerprint) == request.expected_carried.as_ref()
 }
 /// A player-menu click with no screen shown: AutoTotem's silent swap,
@@ -469,7 +466,11 @@ fn submit_silent(game: &mut Game<'_>, request: &Request) -> bool {
 /// (`close_screen`). A container's menu replaced the player menu: nothing to
 /// close.
 fn silent_close(game: &mut Game<'_>, close_screen: bool) {
-    if game.remote.as_ref().is_none_or(|r| r.menu.is_some()) {
+    if game
+        .remote
+        .as_ref()
+        .is_none_or(|r| r.menu.current.is_some())
+    {
         return;
     }
     match game.screen {
@@ -537,7 +538,9 @@ pub fn dispatch(game: &mut Game<'_>) {
             ThrowEffect::Select(slot) if slot < 9 => game.selected = usize::from(slot),
             ThrowEffect::Use => super::vape_macros::use_once(game),
             ThrowEffect::Drop if game.remote.is_some() => game.remote_drop(false),
-            ThrowEffect::Drop => game.drop_held(false),
+            ThrowEffect::Drop => {
+                game.drop_held(false);
+            }
             ThrowEffect::SilentUse(slot) => {
                 silent_use(game, usize::from(slot), None);
             }
@@ -546,11 +549,14 @@ pub fn dispatch(game: &mut Game<'_>) {
     }
     // InventoryFill: the hovered slot of an open container screen.
     if game.screen == Screen::Inventory
-        && let Some(size) = game.renderer.as_ref().map(|r| [r.config.width, r.config.height])
+        && let Some(size) = game
+            .renderer
+            .as_ref()
+            .map(|r| [r.config.width, r.config.height])
     {
         use crate::game::vape_rs::core::inventory_fill::FillInput;
         use winit::{event::MouseButton, keyboard::KeyCode};
-        let batch = horizon_client::hud::HudBatch::new(size);
+        let batch = horizon_client::hud::HudBatch::new(size, game.settings.gui_scale_inputs());
         let input = FillInput {
             now: snapshot.observed,
             container_screen: true,
@@ -614,7 +620,9 @@ fn silent_use(game: &mut Game<'_>, slot: usize, look: Option<(f32, f32)>) -> boo
         return false;
     }
     let (selected, view) = (game.selected, (game.yaw, game.pitch));
-    game.send(S::SetCarriedItem(play::SetCarriedItem { slot: slot as i16 }));
+    game.send(S::SetCarriedItem(play::SetCarriedItem {
+        slot: slot as i16,
+    }));
     game.selected = slot;
     if let Some((yaw, pitch)) = look {
         (game.yaw, game.pitch) = (yaw, pitch);
@@ -626,7 +634,7 @@ fn silent_use(game: &mut Game<'_>, slot: usize, look: Option<(f32, f32)>) -> boo
         slot: selected as i16,
     }));
     if let Some(r) = game.remote.as_mut() {
-        r.carried = Some(selected);
+        r.carried.set(Some(selected));
     }
     true
 }
@@ -640,7 +648,10 @@ thread_local! {
 fn motion_allowed(game: &Game<'_>) -> bool {
     game.remote.is_some()
         && game.title.is_none()
-        && game.player.as_ref().is_some_and(|p| p.health.health() > 0.0)
+        && game
+            .player
+            .as_ref()
+            .is_some_and(|p| p.health.health() > 0.0)
 }
 /// `auto-heal-pre-motion` (HEAD of `remote_send_state`): AutoHeal's
 /// `EventPreMotion`. Replace's window-0 SWAP goes out first (the server's
@@ -657,7 +668,10 @@ pub fn auto_heal_pre_motion(game: &mut Game<'_>) {
     };
     let motion = with_client(&client, |r| r.auto_heal_pre_motion(&snapshot));
     if let Some((from, button)) = motion.swap
-        && game.remote.as_ref().is_some_and(|r| r.menu.is_none())
+        && game
+            .remote
+            .as_ref()
+            .is_some_and(|r| r.menu.current.is_none())
     {
         game.remote_menu_ops(&[(Some(usize::from(from)), i32::from(button), Input::Swap)]);
     }

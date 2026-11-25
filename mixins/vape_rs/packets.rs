@@ -109,12 +109,22 @@ pub fn flush_inbound(game: &mut Game<'_>) {
 }
 
 /// What Backtrack makes of a clientbound packet.
-fn tracked(game: &Game<'_>, packet: &C) -> crate::game::vape_rs::modules::blatant::backtrack::Packet {
+fn tracked(
+    game: &Game<'_>,
+    packet: &C,
+) -> crate::game::vape_rs::modules::blatant::backtrack::Packet {
     use crate::game::vape_rs::modules::blatant::backtrack::Packet as T;
     use horizon_protocol::packets::play::{self, VecDelta};
-    let host = |id: i32| game.remote.as_ref().and_then(|r| r.entities.get(&id)).map(|t| t.position);
+    let host = |id: i32| {
+        game.remote
+            .as_ref()
+            .and_then(|r| r.entities.get(&id))
+            .map(|t| t.position)
+    };
     match packet {
-        C::MoveEntityPos(play::MoveEntityPos(m)) | C::MoveEntityPosRot(play::MoveEntityPosRot(m)) | C::MoveEntityRot(play::MoveEntityRot(m)) => T::Moved {
+        C::MoveEntityPos(play::MoveEntityPos(m))
+        | C::MoveEntityPosRot(play::MoveEntityPosRot(m))
+        | C::MoveEntityRot(play::MoveEntityRot(m)) => T::Moved {
             id: m.id,
             host: host(m.id),
             steps: match &m.delta {
@@ -123,14 +133,32 @@ fn tracked(game: &Game<'_>, packet: &C) -> crate::game::vape_rs::modules::blatan
                 None => Vec::new(),
             },
         },
-        C::EntityPositionSync(p) => T::Synced { id: p.id, at: p.path.end() },
+        C::EntityPositionSync(p) => T::Synced {
+            id: p.id,
+            at: p.path.end(),
+        },
         C::TeleportEntity(p) => {
             let base = host(p.id).unwrap_or([0.0; 3]);
-            let rel = |bit: i32, i: usize| if p.relatives & bit != 0 { base[i] + p.position[i] } else { p.position[i] };
-            T::Teleported { id: p.id, at: [rel(play::relative::X, 0), rel(play::relative::Y, 1), rel(play::relative::Z, 2)] }
+            let rel = |bit: i32, i: usize| {
+                if p.relatives & bit != 0 {
+                    base[i] + p.position[i]
+                } else {
+                    p.position[i]
+                }
+            };
+            T::Teleported {
+                id: p.id,
+                at: [
+                    rel(play::relative::X, 0),
+                    rel(play::relative::Y, 1),
+                    rel(play::relative::Z, 2),
+                ],
+            }
         }
         C::RemoveEntities(p) => T::Removed(p.ids.clone()),
-        C::SetEntityMotion(p) if game.remote.as_ref().is_some_and(|r| r.entity_id == p.id) => T::OwnVelocity,
+        C::SetEntityMotion(p) if game.remote.as_ref().is_some_and(|r| r.entity_id == p.id) => {
+            T::OwnVelocity
+        }
         _ => T::Other,
     }
 }
@@ -138,9 +166,9 @@ fn tracked(game: &Game<'_>, packet: &C) -> crate::game::vape_rs::modules::blatan
 /// `handle_packet` HEAD: Break drops or holds the packet (the host sees it
 /// later through `replay`), Continue hands it to the host now.
 pub fn inbound(game: &mut Game<'_>, packet: &C) -> core::ops::ControlFlow<super::Result<()>> {
-    use core::ops::ControlFlow::{Break, Continue};
     use crate::game::vape_rs::modules::blatant::backtrack as bt;
     use crate::game::vape_rs::modules::combat::knockback::{Context, Verdict};
+    use core::ops::ControlFlow::{Break, Continue};
     if REPLAYING.with(Cell::get) {
         return Continue(());
     }
@@ -148,7 +176,9 @@ pub fn inbound(game: &mut Game<'_>, packet: &C) -> core::ops::ControlFlow<super:
     let now = now_ms();
     // Repel's expected hit delay: damage packets are timed on arrival.
     match packet {
-        C::EntityEvent(p) if p.event == 2 => with_client(&client, |runtime| runtime.outbound_hit(p.id, now)),
+        C::EntityEvent(p) if p.event == 2 => {
+            with_client(&client, |runtime| runtime.outbound_hit(p.id, now))
+        }
         C::HurtAnimation(p) => with_client(&client, |runtime| runtime.outbound_hit(p.id, now)),
         _ => {}
     }
@@ -160,7 +190,11 @@ pub fn inbound(game: &mut Game<'_>, packet: &C) -> core::ops::ControlFlow<super:
     }
     let (hold, blink, flush) = with_client(&client, |runtime| {
         runtime.backtrack_held(queued());
-        (runtime.inbound_hold_active(), runtime.blink_holds_inbound(), runtime.take_inbound_flush())
+        (
+            runtime.inbound_hold_active(),
+            runtime.blink_holds_inbound(),
+            runtime.take_inbound_flush(),
+        )
     });
     if queued() > 0 {
         // Everything when nobody holds or a module let go, else what is due.
@@ -175,7 +209,10 @@ pub fn inbound(game: &mut Game<'_>, packet: &C) -> core::ops::ControlFlow<super:
     {
         let friends = with_client(&client, |runtime| runtime.friend_keys());
         let facing = crate::game::vape_combat::facing(game, &friends);
-        let in_water = game.player.as_ref().is_some_and(|pl| pl.fluids.was_touching_water);
+        let in_water = game
+            .player
+            .as_ref()
+            .is_some_and(|pl| pl.fluids.was_touching_water);
         let ctx = Context {
             now_ms: now,
             in_water,
@@ -183,11 +220,16 @@ pub fn inbound(game: &mut Game<'_>, packet: &C) -> core::ops::ControlFlow<super:
             target: facing.target_facing_player,
             queued: queued(),
         };
-        verdict = with_client(&client, |runtime| runtime.knockback_packet(&ctx, p.velocity));
+        verdict = with_client(&client, |runtime| {
+            runtime.knockback_packet(&ctx, p.velocity)
+        });
     }
     let mut tracked_verdict = bt::Verdict::Pass;
     if let Some(player) = game.player.as_ref() {
-        let ctx = bt::Context { now_ms: now, player: [player.position.x, player.position.y, player.position.z] };
+        let ctx = bt::Context {
+            now_ms: now,
+            player: [player.position.x, player.position.y, player.position.z],
+        };
         let event = tracked(game, packet);
         tracked_verdict = with_client(&client, |runtime| runtime.backtrack_packet(&ctx, &event));
     }
@@ -215,7 +257,9 @@ pub fn inbound(game: &mut Game<'_>, packet: &C) -> core::ops::ControlFlow<super:
     let (due, owner) = match (want, tail) {
         (Some((due, owner)), tail) => (due.max(tail.map_or(0, |t| t.0)), owner),
         // Behind what is held, unless Backtrack's own flush frees it all.
-        (None, Some((_, owner))) if tracked_verdict == bt::Verdict::Flush && owner == Owner::Backtrack => {
+        (None, Some((_, owner)))
+            if tracked_verdict == bt::Verdict::Flush && owner == Owner::Backtrack =>
+        {
             return match replay(game, true) {
                 Ok(()) => Continue(()),
                 Err(error) => Break(Err(error)),
@@ -230,21 +274,37 @@ pub fn inbound(game: &mut Game<'_>, packet: &C) -> core::ops::ControlFlow<super:
             Err(error) => Break(Err(error)),
         };
     }
-    INBOUND.with(|q| q.borrow_mut().push_back(Held { due, owner, packet: packet.clone() }));
+    INBOUND.with(|q| {
+        q.borrow_mut().push_back(Held {
+            due,
+            owner,
+            packet: packet.clone(),
+        })
+    });
     Break(Ok(()))
 }
 
 fn now_ms() -> u64 {
     static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
-    START.get_or_init(std::time::Instant::now).elapsed().as_millis() as u64
+    START
+        .get_or_init(std::time::Instant::now)
+        .elapsed()
+        .as_millis() as u64
 }
 
 fn classify(game: &Game<'_>, packet: &S) -> Packet {
     match packet {
-        S::MovePlayerPos(_) | S::MovePlayerPosRot(_) | S::MovePlayerRot(_) | S::MovePlayerStatus(_) => Packet::Movement,
+        S::MovePlayerPos(_)
+        | S::MovePlayerPosRot(_)
+        | S::MovePlayerRot(_)
+        | S::MovePlayerStatus(_) => Packet::Movement,
         S::Attack(a) => Packet::Attack {
             id: a.id,
-            hurt_time: game.mobs.iter().find(|m| m.id as i32 == a.id && !m.removed).map(|m| m.hurt_time),
+            hurt_time: game
+                .mobs
+                .iter()
+                .find(|m| m.id as i32 == a.id && !m.removed)
+                .map(|m| m.hurt_time),
         },
         S::PlayerAction(a) if a.action == 6 => Packet::ReleaseUse, // RELEASE_USE_ITEM (5 is DROP_ITEM)
         _ => Packet::Other,
@@ -276,7 +336,9 @@ pub fn send(game: &Game<'_>, packet: &S) -> core::ops::ControlFlow<()> {
     if game.remote.is_none() {
         return core::ops::ControlFlow::Continue(());
     }
-    let Some(player) = game.player.as_ref() else { return core::ops::ControlFlow::Continue(()); };
+    let Some(player) = game.player.as_ref() else {
+        return core::ops::ControlFlow::Continue(());
+    };
     let client = crate::game::vape_rs::core::client().clone();
     let ctx = Context {
         now_ms: now_ms(),
@@ -329,16 +391,22 @@ pub fn tick(game: &mut Game<'_>) {
     if let Some(player) = game.player.as_ref() {
         let motion = [player.velocity.x, player.velocity.y, player.velocity.z];
         let on_ground = player.ground.on_ground;
-        let jump_down = game.keys.contains(&winit::keyboard::KeyCode::Space);
-        with_client(&client, |runtime| runtime.knockback_tick(on_ground, motion, jump_down));
+        let jump_down = game.keys.raw(&winit::keyboard::KeyCode::Space);
+        with_client(&client, |runtime| {
+            runtime.knockback_tick(on_ground, motion, jump_down)
+        });
     }
     let target_hurt = with_client(&client, |runtime| runtime.outbound_target())
         .and_then(|id| game.mobs.iter().find(|m| m.id as i32 == id && !m.removed))
         .map(|m| m.hurt_time);
     let held_out = HELD.with(|h| h.borrow().len());
-    let flush = with_client(&client, |runtime| runtime.outbound_tick(target_hurt, held_out));
+    let flush = with_client(&client, |runtime| {
+        runtime.outbound_tick(target_hurt, held_out)
+    });
     release(game, flush || game.player.is_none());
-    let Some(player) = game.player.as_ref() else { return; };
+    let Some(player) = game.player.as_ref() else {
+        return;
+    };
     if game.remote.is_none() {
         return;
     }
@@ -354,6 +422,8 @@ pub fn tick(game: &mut Game<'_>) {
     };
     let count = with_client(&client, |runtime| runtime.regen_packets(vitals));
     for _ in 0..count {
-        game.send(S::MovePlayerStatus(horizon_protocol::packets::play::MovePlayerStatus { flags: 0 }));
+        game.send(S::MovePlayerStatus(
+            horizon_protocol::packets::play::MovePlayerStatus { flags: 0 },
+        ));
     }
 }

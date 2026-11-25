@@ -14,8 +14,8 @@ fn local(game: &Game<'_>) -> bool {
 /// The living entity of the extended-reach ray trace (`objectMouseOver`).
 fn crosshair(game: &Game<'_>) -> Option<usize> {
     game.mob_hit()
-        .filter(|(_, d)| game.before_block(*d))
-        .map(|(i, _)| i)
+        .filter(|(_, d, _)| game.before_block(*d))
+        .map(|(i, _, _)| i)
 }
 
 pub(crate) fn view(game: &Game<'_>) -> View {
@@ -55,7 +55,10 @@ fn on_ladder(game: &Game<'_>) -> bool {
     };
     let here = state(at[1]);
     let here_name = name(here);
-    if game.block_in_tag("minecraft:climbable", &here_name) {
+    if mod_api::__private::block_key(&here_name)
+        .and_then(|key| game.block_in_tag(key, "minecraft:climbable"))
+        .unwrap_or(false)
+    {
         return true;
     }
     let below = state(at[1] - 1);
@@ -79,17 +82,23 @@ fn attack_effects(game: &mut Game<'_>, mob: usize) {
         "minecraft:{}",
         game.mobs[mob].kind.id.trim_start_matches("minecraft:")
     );
-    let magic = game.enchant_damage_bonus(&kind) > 0.0;
+    let magic = game.enchant_damage_bonus(&kind, Some(game.mobs[mob].id)) > 0.0;
     let area = game.mobs[mob].bounds();
     let (feet, size) = (area.bottom_center(), area.size());
-    for (on, particle) in [(crit, ParticleType::Crit), (magic, ParticleType::EnchantedHit)] {
+    for (on, particle) in [
+        (crit, ParticleType::Crit),
+        (magic, ParticleType::EnchantedHit),
+    ] {
         if on {
             // `EffectRenderer.emitParticleAtEntity`: local only.
             game.particles.tracking_emitter(
                 ParticleOptions::simple(particle),
-                [feet.x, feet.y, feet.z],
-                size.x,
-                size.y,
+                horizon_client::particles::TrackingTarget::Entity(game.mobs[mob].id as i32),
+                horizon_client::particles::TrackingBody {
+                    feet: [feet.x, feet.y, feet.z],
+                    width: size.x,
+                    height: size.y,
+                },
             );
         }
     }
@@ -129,7 +138,11 @@ pub(crate) fn attack(game: &mut Game<'_>) -> ControlFlow<bool> {
     {
         attack_effects(game, mob);
     }
-    if click.cancel { Break(false) } else { Continue(()) }
+    if click.cancel {
+        Break(false)
+    } else {
+        Continue(())
+    }
 }
 
 /// `remote_use` and `remote_continue_attack` HEAD: mode Normal holds back
@@ -139,5 +152,9 @@ pub(crate) fn hold_use(game: &Game<'_>) -> ControlFlow<()> {
         return Continue(());
     }
     let client = crate::game::vape_rs::core::client().clone();
-    if with_client(&client, |rt| rt.hit_select_cancel_use()) { Break(()) } else { Continue(()) }
+    if with_client(&client, |rt| rt.hit_select_cancel_use()) {
+        Break(())
+    } else {
+        Continue(())
+    }
 }

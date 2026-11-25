@@ -3,11 +3,11 @@
 // (collision shapes only, so liquids pass, as `rayTraceBlocks` without
 // stopOnLiquid), and the slot switches and throws it answers with.
 use super::{S, play};
+use crate::game::Game;
 use crate::game::vape_rs::core::pearl_runtime::{PearlAction, PearlInput};
 use crate::game::vape_rs::core::with_client;
 use crate::game::vape_rs::modules::utility::auto_pearl::{Hit, Pearl, Person};
 use crate::game::vape_rs::targeting::entities::EntityClass;
-use crate::game::Game;
 use horizon_client::projectiles::{ProjectileKind, ProjectileWorld};
 use horizon_core::geometry::Vec3;
 use std::time::Instant;
@@ -26,8 +26,14 @@ fn people(game: &Game<'_>, position: [f64; 3]) -> Vec<Person> {
     let mut out: Vec<Person> = game
         .mobs
         .iter()
-        .filter(|m| m.alive() && EntityClass::classify(&m.kind.id, &m.kind.category) == EntityClass::Player)
-        .map(|m| Person { id: m.id as i32, position: [m.position.x, m.position.y, m.position.z], local: false })
+        .filter(|m| {
+            m.alive() && EntityClass::classify(&m.kind.id, &m.kind.category) == EntityClass::Player
+        })
+        .map(|m| Person {
+            id: m.id as i32,
+            position: [m.position.x, m.position.y, m.position.z],
+            local: false,
+        })
         .collect();
     if let Some(host) = &game.lan {
         out.extend(
@@ -35,16 +41,24 @@ fn people(game: &Game<'_>, position: [f64; 3]) -> Vec<Person> {
                 .guests
                 .iter()
                 .filter(|g| host.hub.here(g) && g.loaded && !g.dead)
-                .map(|g| Person { id: g.entity_id, position: g.position, local: false }),
+                .map(|g| Person {
+                    id: g.entity_id,
+                    position: g.position,
+                    local: false,
+                }),
         );
     }
     let local = game
         .remote
         .as_ref()
         .map(|r| r.entity_id)
-        .or(game.lan.as_ref().map(|h| h.host_entity))
+        .or(game.lan.as_ref().map(|_| game.own_entity_id()))
         .unwrap_or(0);
-    out.push(Person { id: local, position, local: true });
+    out.push(Person {
+        id: local,
+        position,
+        local: true,
+    });
     out
 }
 
@@ -58,15 +72,19 @@ fn silent_use(game: &mut Game<'_>, rotation: (f32, f32)) {
         // carried slot, so a slot chosen this tick goes out first.
         let selected = game.selected;
         if let Some(r) = game.remote.as_mut()
-            && r.carried != Some(selected)
+            && r.carried.get() != Some(selected)
         {
-            r.carried = Some(selected);
-            game.send(S::SetCarriedItem(play::SetCarriedItem { slot: selected as i16 }));
+            r.carried.set(Some(selected));
+            game.send(S::SetCarriedItem(play::SetCarriedItem {
+                slot: selected as i16,
+            }));
         }
-        game.remote_use();
+        game.remote_use(mod_api::InteractionAttempt::Press);
     } else if game.using.is_none() {
         if let Err(error) = game.use_with_hand() {
-            with_client(&crate::game::vape_rs::core::client(), |r| r.notify(format!("Pearl throw failed: {error}")));
+            with_client(&crate::game::vape_rs::core::client(), |r| {
+                r.notify(format!("Pearl throw failed: {error}"))
+            });
         }
         game.use_delay = 4;
     }
@@ -116,11 +134,21 @@ pub fn tick(game: &mut Game<'_>) {
         people: &people,
     };
     let base = game.mob_world_base(&[]);
-    let world = crate::game::creatures::ProjWorld { w: &base, targets: Vec::new() };
+    let world = crate::game::creatures::ProjWorld {
+        w: &base,
+        targets: &[],
+        border: Some(game.border.bounds()),
+    };
     let mut ray = |from: [f64; 3], to: [f64; 3]| {
         world
-            .clip(Vec3::new(from[0], from[1], from[2]), Vec3::new(to[0], to[1], to[2]))
-            .map(|(at, _, _)| Hit { position: [at.x, at.y, at.z], water: false })
+            .clip(
+                Vec3::new(from[0], from[1], from[2]),
+                Vec3::new(to[0], to[1], to[2]),
+            )
+            .map(|(at, _, _)| Hit {
+                position: [at.x, at.y, at.z],
+                water: false,
+            })
     };
     let out = with_client(&client, |r| r.pearls_tick(&input, &mut ray));
     for action in out.actions {
@@ -140,6 +168,8 @@ pub fn tick(game: &mut Game<'_>) {
 /// `onPlayerUseItem`: the local player used an ender pearl.
 pub fn used(game: &Game<'_>, item: &str) {
     if item == "minecraft:ender_pearl" {
-        with_client(&crate::game::vape_rs::core::client(), |r| r.pearl_used(Instant::now()));
+        with_client(&crate::game::vape_rs::core::client(), |r| {
+            r.pearl_used(Instant::now())
+        });
     }
 }

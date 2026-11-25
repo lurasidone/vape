@@ -29,13 +29,20 @@ fn local(game: &Game<'_>) -> bool {
 }
 
 fn no_screen(game: &Game<'_>) -> bool {
-    game.screen == Screen::Playing && game.title.is_none() && !game.dialog_open() && game.server_packs.prompt.is_none()
+    game.screen == Screen::Playing
+        && game.title.is_none()
+        && !game.dialog_open()
+        && game.server_packs.prompt.is_none()
 }
 
 /// A sword in the main hand (`ItemStack.getItem() instanceof ItemSword`).
 fn sword(game: &Game<'_>) -> bool {
     game.held().is_some_and(|s| {
-        game.res.items().item_tags.get("minecraft:swords").is_some_and(|tag| tag.contains(&*s.item))
+        game.res
+            .items()
+            .item_tags
+            .get("minecraft:swords")
+            .is_some_and(|tag| tag.contains(&*s.item))
     })
 }
 
@@ -57,7 +64,7 @@ fn input(game: &Game<'_>) -> Input {
         // `hurtResistantTime`: 20 at a hit while the hurt time counts 10.
         hurt_resistant_time: if hurt > 0 { hurt + 10 } else { 0 },
         focused: game.focused,
-        targeting_entity: game.mob_hit().is_some_and(|(_, d)| game.before_block(d)),
+        targeting_entity: game.mob_hit().is_some_and(|(_, d, _)| game.before_block(d)),
         ..Input::default()
     }
 }
@@ -69,7 +76,13 @@ fn player_view(game: &Game<'_>) -> PlayerView {
     };
     let position = [p.position.x, p.position.y, p.position.z];
     let (yaw, pitch) = crate::game::remote::vape_combat_remote::rotation((game.yaw, game.pitch));
-    PlayerView { position, tick_position: position, yaw, pitch, strafe: 0.0 }
+    PlayerView {
+        position,
+        tick_position: position,
+        yaw,
+        pitch,
+        strafe: 0.0,
+    }
 }
 
 fn apply(game: &mut Game<'_>, key: Key) {
@@ -134,7 +147,11 @@ pub(crate) fn tick(game: &mut Game<'_>) {
 
 /// `play_mouse` HEAD below the binds: Manual's block at an attack press,
 /// Auto/Predict's cancelled use press while attacking with a sword.
-pub(crate) fn mouse(game: &mut Game<'_>, button: winit::event::MouseButton, pressed: bool) -> ControlFlow<()> {
+pub(crate) fn mouse(
+    game: &mut Game<'_>,
+    button: winit::event::MouseButton,
+    pressed: bool,
+) -> ControlFlow<()> {
     use winit::event::MouseButton;
     if !local(game) || game.screen != Screen::Playing {
         return Continue(());
@@ -217,9 +234,12 @@ pub(crate) fn send(game: &Game<'_>, packet: &S) -> ControlFlow<()> {
     }
     let client = crate::game::vape_rs::core::client().clone();
     let release_use = matches!(packet, S::PlayerAction(a) if a.action == 6);
-    let Some((lag, buffering)) =
-        try_with_client(&client, |rt| (rt.block_hit_mode() == Some(Mode::Lag), rt.block_hit_buffering()))
-    else {
+    let Some((lag, buffering)) = try_with_client(&client, |rt| {
+        (
+            rt.block_hit_mode() == Some(Mode::Lag),
+            rt.block_hit_buffering(),
+        )
+    }) else {
         return Continue(());
     };
     let queued = QUEUE.with(|q| !q.borrow().is_empty());
@@ -232,7 +252,9 @@ pub(crate) fn send(game: &Game<'_>, packet: &S) -> ControlFlow<()> {
     // The target and the sword decide only while buffering.
     let (target, sword) = if buffering {
         let epoch = try_with_client(&client, |rt| rt.session().epoch());
-        let entities = epoch.map(|e| super::vape_combat::snapshot(game, e, None)).unwrap_or_default();
+        let entities = epoch
+            .map(|e| super::vape_combat::snapshot(game, e, None))
+            .unwrap_or_default();
         let player = player_view(game);
         (
             try_with_client(&client, |rt| rt.block_hit_target(&player, &entities)).unwrap_or(false),
@@ -241,7 +263,9 @@ pub(crate) fn send(game: &Game<'_>, packet: &S) -> ControlFlow<()> {
     } else {
         (false, false)
     };
-    let Some(verdict) = try_with_client(&client, |rt| rt.block_hit_send(release_use, target, sword)) else {
+    let Some(verdict) =
+        try_with_client(&client, |rt| rt.block_hit_send(release_use, target, sword))
+    else {
         return Continue(());
     };
     match verdict {

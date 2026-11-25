@@ -1,3 +1,4 @@
+use crate::game::vape_current_support::PlayerMotionExt;
 // Host side of Freecam (reference `FreecamModernController`). It sits under
 // game.rs beside the view and the physical keys: the tick feeds the module
 // the player and the movement keys and holds the player's rotation, the
@@ -5,17 +6,21 @@
 // turn hook sends the mouse to the camera, and the body hook draws the
 // player where it stands (Spawn Fake). The movement keys are released
 // through the movement writer (`input_delays.rs`).
-use crate::game::{Game, Screen};
 use crate::game::vape_rs::core::with_client;
 use crate::game::vape_rs::modules::render::freecam;
+use crate::game::{Game, Screen};
 use winit::keyboard::KeyCode;
 
 /// Keys physically held, through the key mapping
 /// (`ClientSettings.isPhysicalKeyDown`, whatever the key set says).
 fn physical(game: &Game<'_>, key: KeyCode) -> bool {
-    game.physical_keys
-        .iter()
-        .any(|&held| game.settings.keys.translate_all(held).into_iter().any(|m| m == Ok(key)))
+    game.physical_keys.iter().any(|&held| {
+        game.settings
+            .keys
+            .translate_all(held)
+            .into_iter()
+            .any(|m| m == Ok(key))
+    })
 }
 
 fn host(game: &Game<'_>) -> bool {
@@ -28,9 +33,14 @@ pub(crate) fn tick(game: &mut Game<'_>) {
         return;
     }
     let client = crate::game::vape_rs::core::client().clone();
-    let (wanted, gui_open) = with_client(&client, |runtime| (runtime.freecam_wanted(), runtime.gui.open));
+    let (wanted, gui_open) = with_client(&client, |runtime| {
+        (runtime.freecam_wanted(), runtime.gui.open)
+    });
     // Freelook's post tick: the queued toggle and Hold's bind state.
-    let (screen, player) = (game.screen != Screen::Playing || gui_open, game.player.is_some());
+    let (screen, player) = (
+        game.screen != Screen::Playing || gui_open,
+        game.player.is_some(),
+    );
     with_client(&client, |runtime| runtime.freelook_tick(screen, player));
     freelook_restore(game);
     if !wanted {
@@ -41,7 +51,11 @@ pub(crate) fn tick(game: &mut Game<'_>) {
         player: player.is_some(),
         health: player.map_or(0.0, |p| p.health.health()),
         eye: player.map_or([0.0; 3], |p| {
-            [p.position.x, p.position.y + f64::from(p.dimensions.eye_height), p.position.z]
+            [
+                p.position.x,
+                p.position.y + f64::from(p.dimensions.eye_height),
+                p.position.z,
+            ]
         }),
         view: (game.yaw, game.pitch),
         no_screen: game.screen == Screen::Playing && !gui_open,
@@ -93,10 +107,21 @@ pub(crate) fn camera_entity(game: &Game<'_>) -> Option<horizon_client::camera::C
     let client = crate::game::vape_rs::core::client().clone();
     let camera = with_client(&client, |runtime| runtime.freecam_camera())?;
     let p = game.player.as_ref()?;
-    let (eye, eye_old) = (f64::from(game.view.eye_height), f64::from(game.view.eye_height_old));
+    let (eye, eye_old) = (
+        f64::from(game.view.eye_height),
+        f64::from(game.view.eye_height_old),
+    );
     Some(horizon_client::camera::CameraEntity {
-        position: [camera.position[0], camera.position[1] - eye, camera.position[2]],
-        previous: [camera.previous[0], camera.previous[1] - eye_old, camera.previous[2]],
+        position: [
+            camera.position[0],
+            camera.position[1] - eye,
+            camera.position[2],
+        ],
+        previous: [
+            camera.previous[0],
+            camera.previous[1] - eye_old,
+            camera.previous[2],
+        ],
         x_rot: camera.pitch,
         y_rot: camera.yaw,
         x_rot_o: camera.pitch,
@@ -141,7 +166,9 @@ pub(crate) fn no_bob(game: &Game<'_>) -> bool {
 
 /// The movement writer's requests (the seven movement keys released, the
 /// arrows' directions with Move Fake).
-pub(crate) fn requests(game: &Game<'_>) -> Vec<crate::game::vape_rs::core::movement_input::Request> {
+pub(crate) fn requests(
+    game: &Game<'_>,
+) -> Vec<crate::game::vape_rs::core::movement_input::Request> {
     if !host(game) {
         return Vec::new();
     }
@@ -151,8 +178,8 @@ pub(crate) fn requests(game: &Game<'_>) -> Vec<crate::game::vape_rs::core::movem
 
 // Freelook (reference `FreeLookHudModule`) shares the camera and turn hooks:
 // each asks Freecam first, then Freelook.
-use crate::game::perspective::CameraType;
 use crate::game::vape_rs::modules::render::freelook::{self, Perspective};
+use horizon_client::camera::CameraType;
 
 thread_local! {
     /// Set while the camera hook asks the host for the player's own camera.
@@ -226,5 +253,7 @@ pub(crate) fn freelook_turn(game: &Game<'_>, xo: f64, yo: f64) -> bool {
     // `degrees_per_count / 0.15`.
     let scale = 0.15 / horizon_client::mouse::degrees_per_count(game.look_options());
     let client = crate::game::vape_rs::core::client().clone();
-    with_client(&client, |runtime| runtime.freelook_turn(xo * scale, yo * scale))
+    with_client(&client, |runtime| {
+        runtime.freelook_turn(xo * scale, yo * scale)
+    })
 }

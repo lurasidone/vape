@@ -1,4 +1,9 @@
-fn inv_walk_keys(world: &mut crate::motion::MotionWorld<'_, '_, '_>, keys: crate::sprint::Keys, sprint_window: i32) -> core::ops::ControlFlow<Result<()>> {
+fn inv_walk_keys(
+    world: &mut crate::motion::MotionWorld<'_, '_, '_>,
+    keys: crate::sprint::Keys,
+    sprint_window: i32,
+) -> core::ops::ControlFlow<Result<()>> {
+    use crate::game::vape_current_support::PlayerMotionExt;
     // InvWalk: the movement keys physically held behind a screen join the
     // (screen-gated, so released) keys of this controlled tick.
     match world.player.vape_rs_take_inv_walk() {
@@ -12,7 +17,9 @@ fn inv_walk_keys(world: &mut crate::motion::MotionWorld<'_, '_, '_>, keys: crate
                 shift: keys.shift || held.shift,
                 ..keys
             };
-            core::ops::ControlFlow::Break(world.controlled_simulation_tick_with_sprint_window(merged, sprint_window))
+            core::ops::ControlFlow::Break(
+                world.controlled_simulation_tick_with_sprint_window(merged, sprint_window),
+            )
         }
         None => core::ops::ControlFlow::Continue(()),
     }

@@ -5,7 +5,10 @@ use super::super::Game;
 use super::super::lan_pvp::Victim;
 use crate::game::vape_rs::core::{ModuleId, with_client};
 use crate::game::vape_rs::modules::combat::keep_sprint::Hit;
-use horizon_protocol::packets::{Empty, play::{self, Serverbound as S}};
+use horizon_protocol::packets::{
+    Empty,
+    play::{self, Serverbound as S},
+};
 use std::cell::Cell;
 
 thread_local! {
@@ -29,11 +32,18 @@ pub fn rotation(value: (f32, f32)) -> (f32, f32) {
 /// integrated attack locally; a LAN guest with this id takes the host's
 /// player attack. False when there is no such living mob or guest.
 pub fn attack(game: &mut Game<'_>, id: i32) -> bool {
-    let Some(index) = game.mobs.iter().position(|m| m.alive() && m.id as i32 == id) else {
+    let Some(index) = game
+        .mobs
+        .iter()
+        .position(|m| m.alive() && m.id as i32 == id)
+    else {
         return attack_guest(game, id);
     };
     let client = crate::game::vape_rs::core::client().clone();
-    let player = game.remote_player_names().iter().any(|(mob, _)| *mob as i32 == id);
+    let player = game
+        .remote_player_names()
+        .iter()
+        .any(|(mob, _)| *mob as i32 == id);
     let hurt_time = game.mobs[index].hurt_time;
     let wtap = with_client(&client, |runtime| {
         runtime.wtap_attack(player, hurt_time);
@@ -67,7 +77,9 @@ fn attack_guest(game: &mut Game<'_>, id: i32) -> bool {
         host.hub
             .guests
             .iter()
-            .find(|g| g.entity_id == id && host.hub.here(g) && g.loaded && !g.dead && !g.spectator())
+            .find(|g| {
+                g.entity_id == id && host.hub.here(g) && g.loaded && !g.dead && !g.spectator()
+            })
             .map(|g| g.conn)
     }) else {
         return false;
@@ -80,10 +92,10 @@ fn attack_guest(game: &mut Game<'_>, id: i32) -> bool {
         runtime.wtap_attack(true, 0);
         runtime.enabled(ModuleId::WTap)
     });
-    if let Some(strike) = game.pvp_strike()
-        && game.pvp_land(&mut host, Victim::Guest(conn), &strike)
+    if let Some(strike) = game.pvp_strike(0)
+        && game.pvp_land(Victim::Guest(conn), &strike)
     {
-        game.weapon_hit_player(Game::pvp_victim_on_ground(&host, Victim::Guest(conn), None));
+        game.weapon_hit_player(Game::pvp_victim_on_ground(game, Victim::Guest(conn)));
         game.pvp_exhaustion();
         if strike.stops_sprint() {
             game.stop_sprint_after_extra_knockback();
@@ -118,19 +130,26 @@ pub fn miss(game: &mut Game<'_>) {
 /// attacker's 0.6 cut and sprint stop after the host applied them.
 pub fn keep_sprint(game: &mut Game<'_>, mob: usize) -> core::ops::ControlFlow<()> {
     use core::ops::ControlFlow;
-    if KEEP_SPRINT_INSIDE.with(Cell::get) || game.serving.is_some() || game.options.dedicated.is_some() {
+    if KEEP_SPRINT_INSIDE.with(Cell::get)
+        || game.serving.is_some()
+        || game.options.dedicated.is_some()
+    {
         return ControlFlow::Continue(());
     }
     let client = crate::game::vape_rs::core::client().clone();
     if !with_client(&client, |runtime| runtime.enabled(ModuleId::KeepSprint)) {
         return ControlFlow::Continue(());
     }
-    let Some(p) = game.player.as_ref() else { return ControlFlow::Continue(()); };
+    let Some(p) = game.player.as_ref() else {
+        return ControlFlow::Continue(());
+    };
     let before = [p.velocity.x, p.velocity.z];
     KEEP_SPRINT_INSIDE.with(|c| c.set(true));
     game.remote_player_attack(mob);
     KEEP_SPRINT_INSIDE.with(|c| c.set(false));
-    let Some(p) = game.player.as_ref() else { return ControlFlow::Break(()); };
+    let Some(p) = game.player.as_ref() else {
+        return ControlFlow::Break(());
+    };
     let hit = Hit {
         before,
         after: [p.velocity.x, p.velocity.z],

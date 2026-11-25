@@ -1,4 +1,5 @@
 fn frame(game: &mut crate::game::Game<'_>) {
+    use crate::game::vape_current_support::FixedStepExt;
     let client = crate::game::vape_rs::core::client().clone();
     if game.serving.is_some() || game.options.dedicated.is_some() {
         return;
@@ -6,8 +7,15 @@ fn frame(game: &mut crate::game::Game<'_>) {
     crate::game::vape_rs::core::with_client(&client, |runtime| {
         runtime.observe_context(crate::game::vape_rs::core::lifecycle::Context {
             in_world: game.player.is_some() && game.title.is_none(),
-            alive: game.player.as_ref().is_some_and(|p| p.health.health() > 0.0),
-            interactive: game.focused && game.screen == crate::game::Screen::Playing && game.title.is_none() && !game.dialog_open() && game.server_packs.prompt.is_none(),
+            alive: game
+                .player
+                .as_ref()
+                .is_some_and(|p| p.health.health() > 0.0),
+            interactive: game.focused
+                && game.screen == crate::game::Screen::Playing
+                && game.title.is_none()
+                && !game.dialog_open()
+                && game.server_packs.prompt.is_none(),
         });
         if !runtime.initialized() {
             let home = horizon_client::logging::game_home();
@@ -45,8 +53,17 @@ fn frame(game: &mut crate::game::Game<'_>) {
             eprintln!("[vape-rs] {note}");
         }
     });
-    let gamma = crate::game::vape_rs::core::with_client(&client, |runtime| runtime.fullbright_gamma(game.settings.gamma, game.player.is_some() && game.title.is_none()));
-    if let Some(gamma) = gamma && let Some(renderer) = game.renderer.as_mut() { renderer.gamma = gamma; }
+    let gamma = crate::game::vape_rs::core::with_client(&client, |runtime| {
+        runtime.fullbright_gamma(
+            game.settings.gamma,
+            game.player.is_some() && game.title.is_none(),
+        )
+    });
+    if let Some(gamma) = gamma
+        && let Some(renderer) = game.renderer.as_mut()
+    {
+        renderer.gamma = gamma;
+    }
     crate::game::vape_legit::frame(game);
     crate::game::remote::vape_macros::frame(game, false);
     crate::game::vape_combat::clickers(game);

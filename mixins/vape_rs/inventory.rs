@@ -1,3 +1,4 @@
+use crate::game::vape_current_support::GameExt;
 use crate::game::vape_rs::{
     actions::HotbarSlot,
     core::lifecycle::EntityHandle,
@@ -129,7 +130,7 @@ pub(super) fn auto_tool(game: &mut Game<'_>, attack_event: bool) {
     });
     let mut entity = game
         .mob_hit()
-        .map(|(index, distance)| (game.mobs[index].id as i32, distance));
+        .map(|(index, distance, _)| (game.mobs[index].id as i32, distance));
     if let Some(hit) = game.remote_object_hit(true)
         && entity.is_none_or(|(_, distance)| hit.distance < distance)
     {
@@ -202,8 +203,8 @@ pub(super) fn auto_tool(game: &mut Game<'_>, attack_event: bool) {
                 let mainhand: f64 = info.map_or(0.0, |info| {
                     info.modifiers
                         .iter()
-                        .filter(|(_, _, _, _, group)| group == "mainhand")
-                        .map(|(_, _, amount, _, _)| *amount)
+                        .filter(|modifier| modifier.slot == "mainhand")
+                        .map(|modifier| modifier.amount)
                         .sum()
                 });
                 mainhand as f32

@@ -2566,3 +2566,37 @@ past all former text adapter errors; the remaining unrelated API drift is
 still **117 compiler errors**, so this is not a successful mod/game build.
 No feature-ledger rows changed and no game scenario was possible from this
 candidate.
+
+## 2026-11-25: complete native bundle builds against the signed current SDK
+
+Adapted the full gameplay mixin set to the user's signed Horizon SDK at
+`f1bb66f353cf67f2aa4665293fc75c8d91186fc7`. The current SDK splits movement
+and clock types into a library crate, so the mod cannot add inherent methods
+to them. `mixins/vape_rs/current_support.rs` carries those per-thread marks
+through local extension traits in the game crate. Updated current equipment,
+attribute, LAN guest, projectile, fog and UI call sites to the SDK's current
+interfaces. A Timer `FixedStep::advance` hook is still unavailable because the
+current native planner does not index that library-crate function; Timer
+scaling remains unvalidated on this SDK.
+
+Added `--full` to `tools/native_sdk_project.py` and checked in
+`tools/current_native_full_manifest.toml` so the candidate uses the complete
+hook list and current support module, rather than a hand-edited ignored
+project. Regenerated it from the signed SDK metadata and built through the
+user's Horizon launcher `0.2.108`. The launcher reported
+`Your mods are built` and produced/selected
+`native-f1bb66f-f1ab7d97848c`; the patched-functions compiler finished with
+zero errors. Re-running the generator and build reproduced that same build
+identity.
+
+Ran that built version with `horizon-ctl` in a fresh isolated scenario at
+`target/scenarios/sdk-full-horizon-ctl-final-tq_7jz2j/` (fresh game, launcher,
+XDG-data and XDG-config homes, and a new local world; no account, player data,
+or Mojang files). Horizon opened the control socket, loaded a local world,
+reached 38 client ticks with 49 chunks loaded, returned live `status` and
+`state`, captured an 800x600 screenshot, and shut down cleanly. The installed
+version metadata identifies the loaded `vape_rs` native mod, and the run
+created its local runtime configuration and profile files. This validates the
+full candidate's build and startup integration; it does not validate the
+individual gameplay features or the missing Timer scaling hook. No feature
+ledger row changed.

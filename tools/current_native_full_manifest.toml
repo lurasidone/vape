@@ -1,0 +1,765 @@
+id = "vape_rs"
+name = "vape-rs"
+version = "0.1.0-dev"
+description = "Local Rust recreation of the Vape client for Horizon"
+authors = []
+api = "0.2"
+side = "client"
+capabilities = ["registries"]
+
+[native]
+game = "26.3"
+horizon = "f1bb66f353cf67f2aa4665293fc75c8d91186fc7"
+mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
+
+
+[[native.mixin]]
+id = "client-tick"
+target = "horizon_client::game::Game<'_>::tick"
+kind = "HEAD"
+helper = "src/adapters/current_tick.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.mixin]]
+id = "control-key-names"
+target = "horizon_client::game::control::key_code"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/current_control_keys.rs"
+bindings = [{ name = "name", ty = "&str", value = "name" }]
+
+[[native.mixin]]
+id = "game-key-capture"
+target = "horizon_client::game::play_input::Game::mapped_key"
+kind = "HEAD"
+helper = "src/adapters/current_keys.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },
+  { name = "pressed", ty = "bool", value = "pressed" },
+  { name = "repeat", ty = "bool", value = "repeat" },
+]
+
+[[native.mixin]]
+id = "agent-key-capture"
+target = "horizon_client::game::control::Game<'_>::control_key_down"
+kind = "HEAD"
+helper = "src/adapters/current_agent_keys.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },
+]
+
+[[native.mixin]]
+id = "client-hud"
+target = "horizon_client::game::extras::Game<'_>::draw_extras"
+kind = "HEAD"
+helper = "src/adapters/current_hud.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+]
+
+
+
+[[native.module]]
+id = "smooth-text"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_smooth_text"
+source = "src/smooth_text.rs"
+
+[[native.module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_rs"
+source = "src/runtime.rs"
+
+
+[[native.module]]
+id = "vape-current-support"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_current_support"
+source = "src/current_support.rs"
+
+[[native.mixin]]
+id = "client-input"
+target = "horizon_client::game::debug_keys::Game<'_>::debug_key"
+kind = "HEAD"
+helper = "src/adapters/input.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },
+  { name = "action", ty = "horizon_client::debug_keys::KeyAction", value = "action" },
+]
+
+
+
+[[native.mixin]]
+id = "gui-events"
+target = "horizon_client::game::window_handler::Game::handle_window_event"
+kind = "HEAD"
+helper = "src/adapters/gui_events.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "id", ty = "winit::window::WindowId", value = "id" },
+  { name = "event", ty = "&winit::event::WindowEvent", value = "&event" },
+]
+
+[[native.mixin]]
+id = "gui-render"
+target = "horizon_client::game::debug_keys::Game<'_>::draw_debug_overlay"
+kind = "HEAD"
+helper = "src/adapters/gui_render.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+]
+
+
+[[native.mixin]]
+id = "control-key-capture"
+target = "horizon_client::game::control::Game<'_>::control_key_down"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/control_key.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },
+]
+
+[[native.mixin]]
+id = "mouse-bind"
+target = "horizon_client::game::play_input::Game::play_mouse"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/mouse_bind.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "button", ty = "winit::event::MouseButton", value = "button" },
+  { name = "pressed", ty = "bool", value = "pressed" },
+]
+
+[[native.mixin]]
+id = "client-frame"
+target = "horizon_client::game::Game<'_>::hud"
+kind = "HEAD"
+helper = "src/adapters/frame.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+
+
+[[native.mixin]]
+id = "session-world-open"
+target = "horizon_client::game::world_session::Game::open_world"
+kind = "HEAD"
+helper = "src/adapters/session_world_open.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[native.mixin]]
+id = "session-world-close"
+target = "horizon_client::game::world_session::Game::close_world"
+kind = "HEAD"
+helper = "src/adapters/session_world_close.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[native.mixin]]
+id = "session-respawn"
+target = "horizon_client::game::screens::Game<'_>::respawn_player"
+kind = "HEAD"
+helper = "src/adapters/session_respawn.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[native.mixin]]
+id = "session-connect"
+target = "horizon_client::game::developer_launch::Game::join_server"
+kind = "HEAD"
+helper = "src/adapters/session_connect.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[native.mixin]]
+id = "session-disconnect"
+target = "horizon_client::game::remote::Game<'_>::leave_server"
+kind = "HEAD"
+helper = "src/adapters/session_disconnect.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[native.mixin]]
+id = "session-remote-dimension"
+target = "horizon_client::game::remote::Game<'_>::enter_remote_dimension"
+kind = "HEAD"
+helper = "src/adapters/session_remote_dimension.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[native.module]]
+id = "hud-painter"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_hud"
+source = "src/hud_painter.rs"
+
+[[native.module]]
+id = "camera"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_camera"
+source = "src/camera.rs"
+
+# Inventory Blur: the vanilla menu background blur behind the survival,
+# creative and container screens, which 26.3 leaves unblurred.
+# Scoreboard: the vanilla sidebar is replaced by the movable HUD panel.
+[[native.mixin]]
+id = "scoreboard-sidebar"
+target = "horizon_client::game::scoreboard::Game<'_>::draw_scoreboard"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/scoreboard.rs"
+bindings = [{ name = "game", ty = "&crate::game::Game<'_>", value = "&*self" }]
+
+[[native.mixin]]
+id = "inventory-blur"
+target = "horizon_client::game::screen_backgrounds::Game::menu_blur"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/inventory_blur.rs"
+bindings = [{ name = "game", ty = "&crate::game::Game<'_>", value = "&*self" }]
+
+# ClientSettings "Blur background": the same menu blur behind the click GUI
+# and the HUD editor, or none when it is off.
+[[native.mixin]]
+id = "gui-blur"
+target = "horizon_client::game::screen_backgrounds::Game::menu_blur"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/gui_blur.rs"
+bindings = [{ name = "game", ty = "&crate::game::Game<'_>", value = "&*self" }]
+
+# The click GUI and the HUD editor do not pause a single-player world.
+[[native.mixin]]
+id = "gui-no-pause"
+target = "horizon_client::game::pointer_capture::Game::pauses_game"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/gui_no_pause.rs"
+bindings = [{ name = "game", ty = "&crate::game::Game<'_>", value = "&*self" }]
+
+[[native.mixin]]
+id = "no-hurt-camera"
+target = "horizon_client::game::fov::Game<'_>::bob_matrix"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/no_hurt_camera.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "partial", ty = "f32", value = "partial" },
+]
+
+[[native.module]]
+id = "inventory"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_inventory"
+source = "src/inventory.rs"
+
+[[native.mixin]]
+id = "auto-tool-attack"
+target = "horizon_client::game::melee::Game::attack"
+kind = "HEAD"
+helper = "src/adapters/auto_tool_attack.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.module]]
+id = "transactions"
+file = "crates/horizon-client/src/game/network/remote/mod.rs"
+name = "vape_transactions"
+source = "src/transactions.rs"
+
+[[native.module]]
+id = "macros"
+file = "crates/horizon-client/src/game/network/remote/mod.rs"
+name = "vape_macros"
+source = "src/macros.rs"
+
+[[native.module]]
+id = "fast-place"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_fast_place"
+source = "src/fast_place.rs"
+
+[[native.mixin]]
+id = "fullbright-night-vision"
+target = "horizon_client::game::sculk::Game<'_>::night_vision_intensity"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/fullbright_night_vision.rs"
+bindings = [{ name = "game", ty = "&crate::game::Game<'_>", value = "&*self" }]
+
+[[native.mixin]]
+id = "clear-water"
+target = "horizon_client::game::render_tick::Game<'_>::frame_fog"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/clear_water.rs"
+bindings = [
+ { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+ { name = "camera", ty = "glam::DVec3", value = "camera" },
+ { name = "sky", ty = "&horizon_client::environment::Sky", value = "sky" },
+ { name = "biome", ty = "u16", value = "biome" },
+ { name = "water_fog_color", ty = "[f32; 3]", value = "water_fog_color" },
+]
+
+[[native.module]]
+id = "auto-fish"
+file = "crates/horizon-client/src/game/items/fishing.rs"
+name = "vape_auto_fish"
+source = "src/auto_fish.rs"
+
+[[native.mixin]]
+id = "fish-hook-data"
+target = "horizon_client::game::fishing::Game<'_>::remote_hook_data"
+kind = "HEAD"
+helper = "src/adapters/fish_hook_data.rs"
+bindings = [
+ { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+ { name = "id", ty = "u32", value = "id" },
+ { name = "values", ty = "&[(u8, i32, horizon_protocol::entity_data::Value)]", value = "values" },
+]
+
+[[native.module]]
+id = "input-delays"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_input_delays"
+source = "src/input_delays.rs"
+
+[[native.module]]
+id = "world-lines"
+file = "crates/horizon-client/src/game/items/fishing.rs"
+name = "vape_world_lines"
+source = "src/world_lines.rs"
+
+[[native.mixin]]
+id = "world-lines-hook"
+target = "horizon_client::game::fishing::Game<'_>::fishing_line"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/world_lines.rs"
+bindings = [
+ { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+ { name = "alpha", ty = "f64", value = "alpha" },
+ { name = "size", ty = "[u32; 2]", value = "size" },
+]
+
+
+[[native.module]]
+id = "parkour"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_parkour"
+source = "src/parkour.rs"
+
+# Time Changer and Weather, from the frame adapter.
+[[native.module]]
+id = "legit"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_legit"
+source = "src/legit.rs"
+
+[[native.module]]
+id = "combat"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_combat"
+source = "src/combat.rs"
+
+# After MouseHandler's accumulated look (`apply_mouse_look`) and before the
+# frame renders: AimAssist turns the view through the host `Entity.turn`.
+[[native.mixin]]
+id = "aim-assist-look"
+target = "horizon_client::game::pad::Game<'_>::pad_look"
+kind = "HEAD"
+helper = "src/adapters/aim_look.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+# SafeWalk: the reference sets MovementInput.sneak only around the move, so
+# the edge back-off applies without crouching. The movement writer marks the
+# local player before its tick; the host's own back-off check then answers true.
+
+[[native.mixin]]
+id = "inbound-packet"
+target = "horizon_client::game::entity_sections::Game::handle_packet"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/inbound_packet.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "packet", ty = "&horizon_protocol::packets::play::Clientbound", value = "&packet" },
+]
+
+# Explosion knockback on the local player (Entity.pushFromExplosion).
+[[native.mixin]]
+id = "explosion-push"
+target = "horizon_client::game::lan_particles::Game<'_>::remote_explode"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/explosion_push.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "packet", ty = "&horizon_protocol::packets::play::Explode", value = "p" },
+]
+
+# Reach and HitBoxes: every entity pick (crosshair, attacks, interactions)
+# with Reach's range and the expanded boxes.
+[[native.mixin]]
+id = "entity-pick"
+target = "horizon_client::game::Game<'_>::mob_hit"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/entity_pick.rs"
+bindings = [{ name = "game", ty = "&crate::game::Game<'_>", value = "&*self" }]
+
+# Reach's EventPostAttack on the remote attack path (the local path rides
+# auto-tool-attack).
+[[native.mixin]]
+id = "remote-attack"
+target = "horizon_client::game::remote::interaction_actions::Game::remote_start_attack"
+kind = "HEAD"
+helper = "src/adapters/remote_attack.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+# Timer: the client clock advances by the scaled frame time.
+
+
+[[native.module]]
+id = "movement"
+file = "crates/horizon-client/src/game/network/remote/mod.rs"
+name = "vape_movement"
+source = "src/movement.rs"
+
+
+
+[[native.module]]
+id = "name-tags"
+file = "crates/horizon-client/src/game/interface/names.rs"
+name = "vape_name_tags"
+source = "src/name_tags.rs"
+
+[[native.mixin]]
+id = "name-tags-hook"
+target = "horizon_client::game::names::Game<'_>::name_tag_geometry"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/name_tags.rs"
+bindings = [
+ { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+ { name = "camera", ty = "glam::DVec3", value = "camera" },
+ { name = "alpha", ty = "f64", value = "alpha" },
+ { name = "out", ty = "&mut Vec<Vertex>", value = "&mut *out" },
+ { name = "see_through", ty = "&mut Vec<Vertex>", value = "&mut *see_through" },
+]
+
+# Blink, FakeLag, NoItemRelease, PotionSaver and Regen at the serverbound send.
+[[native.module]]
+id = "packets"
+file = "crates/horizon-client/src/game/network/remote/mod.rs"
+name = "vape_packets"
+source = "src/packets.rs"
+
+[[native.mixin]]
+id = "outbound-packet"
+target = "horizon_client::game::remote::Game<'_>::send"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/outbound_packet.rs"
+bindings = [
+ { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+ { name = "packet", ty = "&horizon_protocol::packets::play::Serverbound", value = "&packet" },
+]
+
+# Combat worker: KillAura/SilentAura tick, attacks by id, the managed
+# rotation in the motion packet, and KeepSprint at the attacker's cut.
+[[native.module]]
+id = "aura"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_aura"
+source = "src/aura.rs"
+
+[[native.module]]
+id = "combat-remote"
+file = "crates/horizon-client/src/game/network/remote/mod.rs"
+name = "vape_combat_remote"
+source = "src/combat_remote.rs"
+
+
+[[native.mixin]]
+id = "keep-sprint"
+target = "horizon_client::game::remote::Game<'_>::remote_player_attack"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/keep_sprint.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "mob", ty = "usize", value = "mob" },
+]
+
+# Movement/world marks (InvWalk keys, NoSlowdown sprint) and LongJump's
+# vine/ice surface query, beside MotionWorld's private block lookups.
+
+[[native.module]]
+id = "world-actions"
+file = "crates/horizon-client/src/game/network/remote/mod.rs"
+name = "vape_world_actions"
+source = "src/world_actions.rs"
+
+# InvWalk: the keys physically held behind a screen join the controlled
+# tick's (screen-released) keys; the helper re-dispatches once.
+
+
+[[native.module]]
+id = "remote-tab"
+file = "crates/horizon-client/src/game/network/remote/mod.rs"
+name = "vape_remote_tab"
+source = "src/remote_tab.rs"
+
+[[native.module]]
+id = "esp-outline"
+file = "crates/horizon-client/src/game/entities/glowing.rs"
+name = "vape_esp_outline"
+source = "src/esp_outline.rs"
+
+[[native.mixin]]
+id = "esp-outline-hook"
+target = "horizon_client::game::glowing::Game<'_>::mob_outline"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/esp_outline.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "m", ty = "&horizon_client::mobs::Mob", value = "m" },
+]
+
+[[native.module]]
+id = "teams"
+file = "crates/horizon-client/src/game/network/remote/mod.rs"
+name = "vape_teams"
+source = "src/teams.rs"
+
+# HitSelect: the click verdict before the host attacks (above remote-attack,
+# so a cancelled click skips it), and mode Normal's held-back use and block
+# hitting.
+[[native.module]]
+id = "hit-select"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_hit_select"
+source = "src/hit_select.rs"
+
+[[native.mixin]]
+id = "hit-select-attack"
+target = "horizon_client::game::remote::interaction_actions::Game::remote_start_attack"
+kind = "HEAD"
+cancellable = true
+priority = 110
+helper = "src/adapters/hit_select_attack.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.mixin]]
+id = "hit-select-use"
+target = "horizon_client::game::remote::interaction_actions::Game::remote_use"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/hit_select_use.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.mixin]]
+id = "hit-select-continue-attack"
+target = "horizon_client::game::remote::interaction_actions::Game::remote_continue_attack"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/hit_select_continue_attack.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+# BlockHit: the modes' use key, the cancelled use press under the binds,
+# Predict's damage notice (inbound-packet) and Lag's held release-use packet
+# below outbound-packet (LOWEST: what another hook held never reaches it).
+[[native.module]]
+id = "block-hit"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_block_hit"
+source = "src/block_hit.rs"
+
+[[native.mixin]]
+id = "block-hit-mouse"
+target = "horizon_client::game::play_input::Game::play_mouse"
+kind = "HEAD"
+cancellable = true
+priority = 90
+helper = "src/adapters/block_hit_mouse.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "button", ty = "winit::event::MouseButton", value = "button" },
+  { name = "pressed", ty = "bool", value = "pressed" },
+]
+
+[[native.mixin]]
+id = "block-hit-send"
+target = "horizon_client::game::remote::Game<'_>::send"
+kind = "HEAD"
+cancellable = true
+priority = 90
+helper = "src/adapters/block_hit_send.rs"
+bindings = [
+ { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+ { name = "packet", ty = "&horizon_protocol::packets::play::Serverbound", value = "&packet" },
+]
+
+# AutoTotem's silent open holds the attack, use and block-break clicks
+# (onClickMouse, onRightClickMouse, onSendClickBlock) on the remote paths.
+[[native.mixin]]
+id = "auto-totem-attack"
+target = "horizon_client::game::remote::interaction_actions::Game::remote_start_attack"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/auto_totem_attack.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.mixin]]
+id = "auto-totem-use"
+target = "horizon_client::game::remote::interaction_actions::Game::remote_use"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/auto_totem_use.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.mixin]]
+id = "auto-totem-break"
+target = "horizon_client::game::remote::interaction_actions::Game::remote_continue_attack"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/auto_totem_break.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+
+[[native.mixin]]
+id = "auto-heal-post-motion"
+target = "horizon_client::game::remote::Game::remote_send_state"
+kind = "HEAD"
+helper = "src/adapters/auto_heal_post_motion.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.module]]
+id = "modern-combat"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_modern_combat"
+source = "src/modern_combat.rs"
+
+# AutoPearl and PearlCatch: the per-tick pearl runtime, and the local
+# player's pearl uses (`onPlayerUseItem`) on a server and in process.
+[[native.module]]
+id = "pearls"
+file = "crates/horizon-client/src/game/network/remote/mod.rs"
+name = "vape_pearls"
+source = "src/pearls.rs"
+
+[[native.mixin]]
+id = "pearl-use-item"
+target = "horizon_client::game::remote::use_item::Game::remote_use_item"
+kind = "HEAD"
+helper = "src/adapters/pearl_use_item.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "hand", ty = "horizon_client::first_person::Hand", value = "hand" },
+]
+
+[[native.mixin]]
+id = "pearl-throw-item"
+target = "horizon_client::game::creatures::Game<'_>::throw_item"
+kind = "HEAD"
+helper = "src/adapters/pearl_throw_item.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+  { name = "stack", ty = "&horizon_client::items::ItemStack", value = "stack" },
+]
+
+# Freecam: the client tick, the render camera taken from the module's
+# camera, the view turns sent to it, and the player's own body drawn in
+# first person (Spawn Fake). Freelook shares the tick, camera and turn
+# hooks: each asks Freecam first, then Freelook.
+[[native.module]]
+id = "freecam"
+file = "crates/horizon-client/src/game.rs"
+name = "vape_freecam"
+source = "src/freecam.rs"
+
+[[native.mixin]]
+id = "freecam-camera"
+target = "horizon_client::game::perspective::Game<'_>::player_camera_entity"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/freecam_camera.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.mixin]]
+id = "freecam-turn"
+target = "horizon_client::game::perspective::Game<'_>::turn_player"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/freecam_turn.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "xo", ty = "f64", value = "xo" },
+  { name = "yo", ty = "f64", value = "yo" },
+]
+
+[[native.mixin]]
+id = "freecam-body"
+target = "horizon_client::game::perspective::Game<'_>::own_body_in_view"
+kind = "HEAD"
+cancellable = true
+helper = "src/adapters/freecam_body.rs"
+bindings = [{ name = "game", ty = "&crate::game::Game<'_>", value = "&*self" }]
+
+
+# Target Info: `potsUsedStrip` counts heal potions used and thrown.
+[[native.mixin]]
+id = "target-info-pot-use"
+target = "horizon_client::game::potions::Game<'_>::use_potion_item"
+kind = "HEAD"
+helper = "src/adapters/target_info_pot_use.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "stack", ty = "&horizon_client::items::ItemStack", value = "stack" },
+]
+
+[[native.mixin]]
+id = "target-info-pot-remote-use"
+target = "horizon_client::game::remote::use_item::Game::remote_use_item"
+kind = "HEAD"
+helper = "src/adapters/target_info_pot_remote_use.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "hand", ty = "horizon_client::first_person::Hand", value = "hand" },
+]
+
+
+[[native.mixin]]
+id = "target-info-pot-remote-data"
+target = "horizon_client::game::remote_projectiles::Game<'_>::remote_projectile_data"
+kind = "HEAD"
+helper = "src/adapters/target_info_pot_remote_data.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "id", ty = "i32", value = "id" },
+  { name = "values", ty = "&[(u8, i32, horizon_protocol::entity_data::Value)]", value = "values" },
+]
+
+
+
+
+
+
+

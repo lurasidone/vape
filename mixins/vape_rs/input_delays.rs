@@ -1,6 +1,7 @@
+use crate::game::vape_current_support::PlayerMotionExt;
 // Client-only input-delay removals. Install at Game::tick HEAD, before either
 // local or remote player simulation decrements/uses these host-owned timers.
-use crate::game::vape_rs::core::{with_client, ModuleId};
+use crate::game::vape_rs::core::{ModuleId, with_client};
 
 pub(crate) fn input_delays(game: &mut crate::game::Game<'_>) {
     if game.serving.is_some()
@@ -70,7 +71,10 @@ fn playing(game: &crate::game::Game<'_>) -> bool {
         && !game.dialog_open()
         && game.server_packs.prompt.is_none()
         && !game.spectator()
-        && game.player.as_ref().is_some_and(|player| player.health.health() > 0.0)
+        && game
+            .player
+            .as_ref()
+            .is_some_and(|player| player.health.health() > 0.0)
 }
 
 /// Collects this tick's module requests and applies the resolved keys. With
@@ -89,7 +93,7 @@ pub(crate) fn movement_again(game: &mut crate::game::Game<'_>) {
 /// The host's canonical movement keys and toggle mappings.
 pub(crate) fn host_view(game: &crate::game::Game<'_>) -> HostView {
     HostView {
-        keys: KEYS.map(|(_, key)| game.keys.contains(&key)),
+        keys: KEYS.map(|(_, key)| game.keys.raw(&key)),
         toggles: [game.toggles.is_down(0), game.toggles.is_down(1)],
     }
 }
@@ -99,9 +103,18 @@ fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: boo
     // A socket key's release is seen at its release event (adapters/input.rs).
     let view = host_view(game);
     let active = requests && playing(game);
-    let invisible = game.potions.effects.list.iter().any(|effect| effect.id == "invisibility");
+    let invisible = game
+        .potions
+        .effects
+        .list
+        .iter()
+        .any(|effect| effect.id == "invisibility");
     let (sprint, parkour, forward, jump) = with_client(&client, |runtime| {
-        let tapped = if again { false } else { runtime.replace_parkour_tap(false) };
+        let tapped = if again {
+            false
+        } else {
+            runtime.replace_parkour_tap(false)
+        };
         // Sprint's latched press (reference onPreEntityUpdate). Scaffold's
         // GodBridge and TellyBridge modes hold the movement-input claim.
         let tick = crate::game::vape_rs::modules::combat::sprint::Tick {
@@ -116,14 +129,22 @@ fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: boo
         (
             runtime.sprint_press(&tick, again),
             // Parkour's `onTick` returns while Freecam is on.
-            active && runtime.enabled(ModuleId::Parkour) && !runtime.enabled(ModuleId::Freecam) && !tapped,
+            active
+                && runtime.enabled(ModuleId::Parkour)
+                && !runtime.enabled(ModuleId::Freecam)
+                && !tapped,
             runtime.movement().user(Axis::Forward, &view),
             runtime.movement().user(Axis::Jump, &view),
         )
     });
     let mut overrides = Overrides::default();
     if sprint {
-        overrides.request(Request { axis: Axis::Sprint, owner: Owner::Sprint, priority: 1, pressed: true });
+        overrides.request(Request {
+            axis: Axis::Sprint,
+            owner: Owner::Sprint,
+            priority: 1,
+            pressed: true,
+        });
     }
     // Parkour taps jump for one tick when the user moves forward without
     // jumping and the ground ends one block ahead.
@@ -137,23 +158,37 @@ fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: boo
         parkour && forward && !jump && crate::game::vape_parkour::edge_ahead(game)
     };
     if tap {
-        overrides.request(Request { axis: Axis::Jump, owner: Owner::Parkour, priority: 1, pressed: true });
+        overrides.request(Request {
+            axis: Axis::Jump,
+            owner: Owner::Parkour,
+            priority: 1,
+            pressed: true,
+        });
     }
     // JumpReset holds the jump key for the tick after our knockback landed.
     if active && with_client(&client, |runtime| runtime.jump_reset_key(again)) {
-        overrides.request(Request { axis: Axis::Jump, owner: Owner::JumpReset, priority: 1, pressed: true });
+        overrides.request(Request {
+            axis: Axis::Jump,
+            owner: Owner::JumpReset,
+            priority: 1,
+            pressed: true,
+        });
     }
     // SafeWalk (reference onPreMove): edge back-off for this tick's move,
     // except when walking straight forward with Direction Check on.
     let safe_walk = with_client(&client, |runtime| {
         active
             && runtime.enabled(ModuleId::SafeWalk)
-            && !(runtime.settings().get("world.safe-walk.direction-check")
-                .and_then(serde_json::Value::as_bool).unwrap_or(true)
+            && !(runtime
+                .settings()
+                .get("world.safe-walk.direction-check")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(true)
                 && !runtime.movement().user(Axis::Sneak, &view)
                 && runtime.movement().user(Axis::Forward, &view)
                 && !runtime.movement().user(Axis::Back, &view)
-                && runtime.movement().user(Axis::Left, &view) == runtime.movement().user(Axis::Right, &view))
+                && runtime.movement().user(Axis::Left, &view)
+                    == runtime.movement().user(Axis::Right, &view))
     });
     if let Some(player) = game.player.as_ref() {
         player.vape_rs_set_safe_walk(safe_walk);
@@ -162,18 +197,33 @@ fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: boo
     // any screen).
     let screen = !playing(game);
     if with_client(&client, |runtime| runtime.wtap_release(screen || !requests)) {
-        overrides.request(Request { axis: Axis::Forward, owner: Owner::WTap, priority: 2, pressed: false });
+        overrides.request(Request {
+            axis: Axis::Forward,
+            owner: Owner::WTap,
+            priority: 2,
+            pressed: false,
+        });
     }
     // Anti-AFK: short walks and small turns while the user is idle. Not
     // re-run for the attack-time pass.
-    if !again && active && let Some(player) = game.player.as_ref() {
+    if !again
+        && active
+        && let Some(player) = game.player.as_ref()
+    {
         use crate::game::vape_rs::modules::world::anti_afk::Tick;
         let tick = with_client(&client, |runtime| {
             let movement = runtime.movement();
             let user_moving = game.focused
-                && [Axis::Forward, Axis::Back, Axis::Left, Axis::Right, Axis::Jump, Axis::Sneak]
-                    .into_iter()
-                    .any(|axis| movement.user(axis, &view));
+                && [
+                    Axis::Forward,
+                    Axis::Back,
+                    Axis::Left,
+                    Axis::Right,
+                    Axis::Jump,
+                    Axis::Sneak,
+                ]
+                .into_iter()
+                .any(|axis| movement.user(axis, &view));
             Tick {
                 now_ms: runtime.now_ms(),
                 user_moving,
@@ -184,14 +234,30 @@ fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: boo
             }
         });
         let actions = with_client(&client, |runtime| runtime.anti_afk_tick(&tick));
-        for (axis, held) in [Axis::Forward, Axis::Back, Axis::Left, Axis::Right].into_iter().zip(actions.keys) {
+        for (axis, held) in [Axis::Forward, Axis::Back, Axis::Left, Axis::Right]
+            .into_iter()
+            .zip(actions.keys)
+        {
             if held {
-                overrides.request(Request { axis, owner: Owner::AntiAfk, priority: 1, pressed: true });
+                overrides.request(Request {
+                    axis,
+                    owner: Owner::AntiAfk,
+                    priority: 1,
+                    pressed: true,
+                });
             }
         }
         if actions.turn != (0.0, 0.0) {
-            let mut rotation = horizon_client::mouse::Rotation { x_rot: game.pitch, y_rot: game.yaw, x_rot_o: game.pitch, y_rot_o: game.yaw };
-            rotation.turn(f64::from(actions.turn.0 / 0.15), f64::from(actions.turn.1 / 0.15));
+            let mut rotation = horizon_client::mouse::Rotation {
+                x_rot: game.pitch,
+                y_rot: game.yaw,
+                x_rot_o: game.pitch,
+                y_rot_o: game.yaw,
+            };
+            rotation.turn(
+                f64::from(actions.turn.0 / 0.15),
+                f64::from(actions.turn.1 / 0.15),
+            );
             game.yaw = rotation.y_rot;
             game.pitch = rotation.x_rot;
         }
@@ -199,9 +265,17 @@ fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: boo
     // Step (reference onStepSnapshot): a one-block step height while on the
     // ground and not sneaking, as a transient client-side modifier.
     if !again && let Some(player) = game.player.as_mut() {
-        let sneaking = game.keys.contains(&KeyCode::ShiftLeft) || game.toggles.is_down(0);
-        let on = with_client(&client, |runtime| runtime.step_active(sneaking, player.ground.on_ground));
-        let _ = player.set_modifier("minecraft:step_height", "vape_rs:step", 0.4, "add_value", on);
+        let sneaking = game.keys.raw(&KeyCode::ShiftLeft) || game.toggles.is_down(0);
+        let on = with_client(&client, |runtime| {
+            runtime.step_active(sneaking, player.ground.on_ground)
+        });
+        let _ = player.set_modifier(
+            "minecraft:step_height",
+            "vape_rs:step",
+            0.4,
+            "add_value",
+            on,
+        );
     }
     // Scaffold Legit's edge sneak, WindCharge's jump, NoFall's jump release.
     for request in crate::game::remote::vape_world_actions::requests(game, active, again, &view) {

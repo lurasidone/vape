@@ -316,31 +316,63 @@ fn export(root: &Path, horizon: &Path) -> Result<PathBuf> {
 fn export_fresh(horizon: &Path, revision: &str, directory: &Path) -> Result<PathBuf> {
     let archive = directory.join("pinned.tar");
     fs::create_dir_all(directory)?;
-    // Export only Git-owned committed content, never a user's working tree or assets.
-    checked(
-        Command::new("git")
-            .arg("-C")
-            .arg(horizon)
-            .arg("archive")
-            .arg(revision)
-            .arg("--output")
-            .arg(&archive),
-    )?;
     let fresh = directory.join("export-new");
     if fresh.exists() {
         fs::remove_dir_all(&fresh)?;
     }
     fs::create_dir(&fresh)?;
-    checked(
-        Command::new("tar")
-            .arg("-xf")
-            .arg(&archive)
-            .arg("-C")
-            .arg(&fresh),
-    )?;
+    if horizon.join(".git").exists() {
+        // Export only Git-owned committed content, never a user's working tree or assets.
+        checked(
+            Command::new("git")
+                .arg("-C")
+                .arg(horizon)
+                .arg("archive")
+                .arg(revision)
+                .arg("--output")
+                .arg(&archive),
+        )?;
+        checked(
+            Command::new("tar")
+                .arg("-xf")
+                .arg(&archive)
+                .arg("-C")
+                .arg(&fresh),
+        )?;
+    } else {
+        // Official source mirrors may be signed source archives without Git history. Accept one
+        // only when its adjacent revision marker names the exact pin; the normal source hash
+        // audit below still checks every tracked Horizon file before staging it.
+        let marker = fs::read_to_string(horizon.join(".horizon-revision"))?;
+        if marker.trim() != revision {
+            return Err(
+                "source export revision marker does not match the pinned Horizon revision".into(),
+            );
+        }
+        copy_tree(horizon, &fresh)?;
+        fs::remove_file(fresh.join(".horizon-revision"))?;
+    }
     remove_links(&fresh)?;
     fs::write(fresh.join(".horizon-revision"), revision)?;
     Ok(fresh)
+}
+
+fn copy_tree(from: &Path, to: &Path) -> Result<()> {
+    for entry in fs::read_dir(from)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_symlink() {
+            return Err("symlinks in source export are unsupported".into());
+        }
+        let destination = to.join(entry.file_name());
+        if ty.is_dir() {
+            fs::create_dir_all(&destination)?;
+            copy_tree(&entry.path(), &destination)?;
+        } else if ty.is_file() {
+            fs::copy(entry.path(), destination)?;
+        }
+    }
+    Ok(())
 }
 
 fn tree_hashes(root: &Path) -> Result<BTreeMap<PathBuf, String>> {

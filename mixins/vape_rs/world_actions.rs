@@ -1,3 +1,5 @@
+use crate::game::vape_current_support::GameExt;
+use crate::game::vape_current_support::PlayerMotionExt;
 // Host side of the movement/world modules (the shared rotation manager,
 // Scaffold and its bridge modes, InvWalk, WindCharge, NoFall's jump release). It sits under game/remote.rs so the
 // remote use path, the open menu id and the physical keys are reachable.
@@ -21,22 +23,40 @@ thread_local! {
 /// Keys physically held, through the key mapping (`KeyMapping.isDown` of
 /// the physical state, whatever screen is open).
 fn physical(game: &Game<'_>, key: KeyCode) -> bool {
-    game.physical_keys
-        .iter()
-        .any(|&held| game.settings.keys.translate_all(held).into_iter().any(|m| m == Ok(key)))
+    game.physical_keys.iter().any(|&held| {
+        game.settings
+            .keys
+            .translate_all(held)
+            .into_iter()
+            .any(|m| m == Ok(key))
+    })
 }
 
 /// Scaffold Legit's edge test: the box shrunk by 0.2 horizontally, moved by
 /// this tick's horizontal motion and one block down, touches nothing.
 fn scaffold_edge(game: &mut Game<'_>) -> bool {
     let entities = game.player_entity_collisions();
-    let Some(player) = game.player.as_mut() else { return false; };
+    let Some(player) = game.player.as_mut() else {
+        return false;
+    };
     let (vx, vz) = (player.velocity.x, player.velocity.z);
     let bounds = player
         .bounds()
         .deflate(horizon_core::geometry::Vec3::new(0.2, 0.0, 0.2))
         .move_by(horizon_core::geometry::Vec3::new(vx, -1.0, vz));
-    let mut motion = horizon_client::motion::MotionWorld { entities: &entities, player, scene: &mut game.world, assets: &game.pack.assets, collision_binding: game.collision, resources: game.motion };
+    let mut motion = horizon_client::motion::MotionWorld {
+        entities: &entities,
+        player,
+        scene: &mut game.world,
+        assets: &game.pack.assets,
+        collision_binding: game.collision,
+        resources: game.motion,
+        health: &game.health_resources,
+        tag_items: Some(game.res.items()),
+        loop_context: &game.loop_context,
+        damage_hooks: &game.damage_hooks,
+        block_registries: Some(&game.pack.block_registries),
+    };
     motion.no_player_collision(bounds).unwrap_or(false)
 }
 
@@ -45,20 +65,46 @@ struct HostWorld<'g, 'a>(&'g mut Game<'a>);
 
 impl World for HostWorld<'_, '_> {
     fn air(&mut self, pos: [i32; 3]) -> bool {
-        let name = &self.0.res.facts().get(self.0.world.block(pos[0], pos[1], pos[2])).name;
-        matches!(&**name, "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air")
+        let name = &self
+            .0
+            .res
+            .facts()
+            .get(self.0.world.block(pos[0], pos[1], pos[2]))
+            .name;
+        matches!(
+            &**name,
+            "minecraft:air" | "minecraft:cave_air" | "minecraft:void_air"
+        )
     }
     fn clear_below(&mut self, at: [f64; 2], shrink: f64) -> bool {
         let game = &mut *self.0;
         let entities = game.player_entity_collisions();
-        let Some(player) = game.player.as_mut() else { return false; };
+        let Some(player) = game.player.as_mut() else {
+            return false;
+        };
         let (vx, vz) = (player.velocity.x, player.velocity.z);
         let bounds = player
             .bounds()
-            .move_by(Vec3::new(at[0] - player.position.x, 0.0, at[1] - player.position.z))
+            .move_by(Vec3::new(
+                at[0] - player.position.x,
+                0.0,
+                at[1] - player.position.z,
+            ))
             .deflate(Vec3::new(shrink, 0.0, shrink))
             .move_by(Vec3::new(vx, -1.0, vz));
-        let mut motion = horizon_client::motion::MotionWorld { entities: &entities, player, scene: &mut game.world, assets: &game.pack.assets, collision_binding: game.collision, resources: game.motion };
+        let mut motion = horizon_client::motion::MotionWorld {
+            entities: &entities,
+            player,
+            scene: &mut game.world,
+            assets: &game.pack.assets,
+            collision_binding: game.collision,
+            resources: game.motion,
+            health: &game.health_resources,
+            tag_items: Some(game.res.items()),
+            loop_context: &game.loop_context,
+            damage_hooks: &game.damage_hooks,
+            block_registries: Some(&game.pack.block_registries),
+        };
         motion.no_player_collision(bounds).unwrap_or(false)
     }
 }
@@ -86,10 +132,15 @@ fn body(game: &mut Game<'_>) -> Option<Body> {
 /// The inventory as the bridge modes read it.
 fn inventory(game: &Game<'_>) -> Inventory {
     let stack = |s: Option<&horizon_client::items::ItemStack>, slot| {
-        s.map(|s| Stack { item: crate::game::vape_combat::item(game, Some(s), slot), count: s.count })
+        s.map(|s| Stack {
+            item: crate::game::vape_combat::item(game, Some(s), slot),
+            count: s.count,
+        })
     };
     Inventory {
-        slots: (0..36).map(|slot| stack(game.inventory.get(slot).and_then(Option::as_ref), slot)).collect(),
+        slots: (0..36)
+            .map(|slot| stack(game.inventory.get(slot).and_then(Option::as_ref), slot))
+            .collect(),
         offhand: stack(game.offhand.as_ref(), 40),
         selected: game.selected,
         creative: game.creative,
@@ -107,7 +158,10 @@ fn crosshair_block(game: &Game<'_>) -> Option<Hit> {
     let (eye, dir) = game.aim()?;
     let reach = game.reach();
     let hit = game.clip_ray(eye, dir, reach)?;
-    let distance = (0..3).map(|i| (hit.point[i] - eye[i]).powi(2)).sum::<f64>().sqrt();
+    let distance = (0..3)
+        .map(|i| (hit.point[i] - eye[i]).powi(2))
+        .sum::<f64>()
+        .sqrt();
     let entity = game
         .mobs
         .iter()
@@ -132,13 +186,32 @@ fn crosshair_block(game: &Game<'_>) -> Option<Hit> {
 /// `isOnLadder`: the player is in a climbable block (`LivingEntity.onClimbable`).
 fn on_ladder(game: &mut Game<'_>) -> bool {
     let entities = game.player_entity_collisions();
-    let Some(player) = game.player.as_mut() else { return false; };
-    let mut motion = horizon_client::motion::MotionWorld { entities: &entities, player, scene: &mut game.world, assets: &game.pack.assets, collision_binding: game.collision, resources: game.motion };
+    let Some(player) = game.player.as_mut() else {
+        return false;
+    };
+    let mut motion = horizon_client::motion::MotionWorld {
+        entities: &entities,
+        player,
+        scene: &mut game.world,
+        assets: &game.pack.assets,
+        collision_binding: game.collision,
+        resources: game.motion,
+        health: &game.health_resources,
+        tag_items: Some(game.res.items()),
+        loop_context: &game.loop_context,
+        damage_hooks: &game.damage_hooks,
+        block_registries: Some(&game.pack.block_registries),
+    };
     motion.climbable().unwrap_or(false)
 }
 
 /// The movement writer's requests from these modules.
-pub(crate) fn requests(game: &mut Game<'_>, active: bool, again: bool, view: &HostView) -> Vec<Request> {
+pub(crate) fn requests(
+    game: &mut Game<'_>,
+    active: bool,
+    again: bool,
+    view: &HostView,
+) -> Vec<Request> {
     let client = crate::game::vape_rs::core::client().clone();
     let mut out = Vec::new();
     // NoFall Normal released jump on a claimed landing; it stays released
@@ -147,27 +220,52 @@ pub(crate) fn requests(game: &mut Game<'_>, active: bool, again: bool, view: &Ho
         let user = runtime.movement().user(Axis::Jump, view);
         runtime.no_fall_jump_released(user)
     }) {
-        out.push(Request { axis: Axis::Jump, owner: Owner::NoFall, priority: 3, pressed: false });
+        out.push(Request {
+            axis: Axis::Jump,
+            owner: Owner::NoFall,
+            priority: 3,
+            pressed: false,
+        });
     }
     // AutoTotem's blockMovementKeys (EventPrePlayerTick, HIGHEST): forward,
     // back, left, right, jump and sprint released; sneak stays.
     if TOTEM_HOLD.with(|h| h.get()) {
-        for axis in [Axis::Forward, Axis::Back, Axis::Left, Axis::Right, Axis::Jump, Axis::Sprint] {
-            out.push(Request { axis, owner: Owner::AutoTotem, priority: 5, pressed: false });
+        for axis in [
+            Axis::Forward,
+            Axis::Back,
+            Axis::Left,
+            Axis::Right,
+            Axis::Jump,
+            Axis::Sprint,
+        ] {
+            out.push(Request {
+                axis,
+                owner: Owner::AutoTotem,
+                priority: 5,
+                pressed: false,
+            });
         }
     }
     if !again && JUMP.with(|j| j.take()) {
-        out.push(Request { axis: Axis::Jump, owner: Owner::WindCharge, priority: 4, pressed: true });
+        out.push(Request {
+            axis: Axis::Jump,
+            owner: Owner::WindCharge,
+            priority: 4,
+            pressed: true,
+        });
     }
     let scaffold = active && with_client(&client, |runtime| runtime.enabled(ModuleId::Scaffold));
     if scaffold && game.player.is_some() {
         let edge = scaffold_edge(game);
         let held = crate::game::vape_combat::held(game);
-        let Some(body) = body(game) else { return out; };
+        let Some(body) = body(game) else {
+            return out;
+        };
         let gui_open = with_client(&client, |runtime| runtime.gui.open);
         let requests = with_client(&client, |runtime| {
             let movement = runtime.movement();
-            let forward = f32::from(u8::from(movement.user(Axis::Forward, view))) - f32::from(u8::from(movement.user(Axis::Back, view)));
+            let forward = f32::from(u8::from(movement.user(Axis::Forward, view)))
+                - f32::from(u8::from(movement.user(Axis::Back, view)));
             let sneak_held = movement.user(Axis::Sneak, view);
             let tick = scaffold::Tick {
                 now_ms: runtime.now_ms(),
@@ -197,7 +295,9 @@ fn inv_walk_screen(game: &Game<'_>, gui_open: bool, capturing: bool) -> inv_walk
         Screen::Playing if gui_open => inv_walk::Screen::Other,
         Screen::Playing => inv_walk::Screen::None,
         Screen::Chat => inv_walk::Screen::Chat,
-        Screen::Inventory if game.container.is_none() && game.remote_menu_id() == 0 => inv_walk::Screen::Inventory,
+        Screen::Inventory if game.container.is_none() && game.remote_menu_id() == 0 => {
+            inv_walk::Screen::Inventory
+        }
         Screen::Paused => inv_walk::Screen::Pause,
         _ => inv_walk::Screen::Other,
     }
@@ -211,16 +311,27 @@ pub(crate) fn tick(game: &mut Game<'_>) {
     let client = crate::game::vape_rs::core::client().clone();
     // AutoTotem's silent open holds the movement keys (and attack/use) from
     // the open until one "Silent move delay" after its close.
-    let totem_hold = with_client(&client, |runtime| runtime.auto_totem_tick(std::time::Instant::now()));
+    let totem_hold = with_client(&client, |runtime| {
+        runtime.auto_totem_tick(std::time::Instant::now())
+    });
     TOTEM_HOLD.with(|h| h.set(totem_hold));
-    let (gui_open, capturing) = with_client(&client, |runtime| (runtime.gui.open, runtime.gui.capturing()));
+    let (gui_open, capturing) = with_client(&client, |runtime| {
+        (runtime.gui.open, runtime.gui.capturing())
+    });
     // The shared rotation manager (`RotationManager.onTick`): a visible
     // controller turns the view; it waits while a screen is open.
     let no_screen = matches!(game.screen, crate::game::Screen::Playing) && !gui_open;
     let sensitivity = f64::from(game.settings.sensitivity);
     let body = body(game);
     let view = (game.yaw, game.pitch);
-    if let Some(p) = game.player.as_ref() { let eye = [p.position.x, p.position.y + f64::from(p.dimensions.eye_height), p.position.z]; with_client(&client, |runtime| runtime.rotation_eye(eye)); }
+    if let Some(p) = game.player.as_ref() {
+        let eye = [
+            p.position.x,
+            p.position.y + f64::from(p.dimensions.eye_height),
+            p.position.z,
+        ];
+        with_client(&client, |runtime| runtime.rotation_eye(eye));
+    }
     let rotated = with_client(&client, |runtime| match &body {
         Some(body) => runtime.rotation_tick_at(view, sensitivity, no_screen, body),
         None => runtime.rotation_tick(view, sensitivity, no_screen),
@@ -261,6 +372,7 @@ pub(crate) fn tick(game: &mut Game<'_>) {
             jump: held.jump,
             shift: held.sneak,
             sprint: false,
+            sprint_suppressed: false,
             analog: None,
         }
     });
@@ -272,10 +384,18 @@ pub(crate) fn tick(game: &mut Game<'_>) {
 
 /// Scaffold GodBridge/TellyBridge's pre-tick: the slot, the right click
 /// (`use.onTick(1)`) and the movement task's keys.
-fn scaffold_bridge_tick(game: &mut Game<'_>, client: &crate::game::vape_rs::core::Client, no_screen: bool, body: Option<Body>) {
-    let Some(body) = body else { return; };
+fn scaffold_bridge_tick(
+    game: &mut Game<'_>,
+    client: &crate::game::vape_rs::core::Client,
+    no_screen: bool,
+    body: Option<Body>,
+) {
+    let Some(body) = body else {
+        return;
+    };
     let bridging = with_client(client, |runtime| {
-        runtime.enabled(ModuleId::Scaffold) && scaffold::Options::read(runtime.settings()).mode != scaffold::Mode::Legit
+        runtime.enabled(ModuleId::Scaffold)
+            && scaffold::Options::read(runtime.settings()).mode != scaffold::Mode::Legit
     });
     if !bridging {
         return;
@@ -291,13 +411,18 @@ fn scaffold_bridge_tick(game: &mut Game<'_>, client: &crate::game::vape_rs::core
         body,
         inventory: inventory(game),
         hit: crosshair_block(game),
-        right_mouse: game.mouse_reading().1[1],
+        right_mouse: game.mouse_held()[1],
         mouse: [mouse.0 as i32, mouse.1 as i32],
         view: [game.yaw, game.pitch],
         user,
     };
-    let actions = with_client(client, |runtime| runtime.scaffold_bridge_tick(tick, &mut HostWorld(game)));
-    let alive = game.player.as_ref().is_some_and(|p| p.health.health() > 0.0);
+    let actions = with_client(client, |runtime| {
+        runtime.scaffold_bridge_tick(tick, &mut HostWorld(game))
+    });
+    let alive = game
+        .player
+        .as_ref()
+        .is_some_and(|p| p.health.health() > 0.0);
     if let Some(slot) = actions.select.filter(|s| *s < 9) {
         if alive && game.title.is_none() {
             game.selected = slot;
@@ -309,12 +434,13 @@ fn scaffold_bridge_tick(game: &mut Game<'_>, client: &crate::game::vape_rs::core
 }
 
 fn wind_charge_tick(game: &mut Game<'_>, client: &crate::game::vape_rs::core::Client) {
-    let charge_slot = game
-        .inventory
-        .iter()
-        .take(9)
-        .position(|s| s.as_ref().is_some_and(|s| &*s.item == "minecraft:wind_charge"));
-    let Some(player) = game.player.as_ref() else { return; };
+    let charge_slot = game.inventory.iter().take(9).position(|s| {
+        s.as_ref()
+            .is_some_and(|s| &*s.item == "minecraft:wind_charge")
+    });
+    let Some(player) = game.player.as_ref() else {
+        return;
+    };
     let tick = wind_charge::Tick {
         charge_slot,
         selected: game.selected,
@@ -336,7 +462,7 @@ fn wind_charge_tick(game: &mut Game<'_>, client: &crate::game::vape_rs::core::Cl
             game.yaw = yaw;
             game.pitch = pitch;
         }
-        game.remote_use();
+        game.remote_use(mod_api::InteractionAttempt::Press);
         if actions.silent {
             (game.yaw, game.pitch) = view;
         }

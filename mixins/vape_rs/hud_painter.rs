@@ -13,7 +13,10 @@ pub(super) fn biome(game: &crate::game::Game<'_>, position: [f64; 3]) -> String 
         .get(&(x >> 4, z >> 4))
         .map(|chunk| {
             let name = &game.res.biomes().get(chunk.biome(x, y, z)).name;
-            horizon_client::lang::get_or(&resource_translation_key("biome", name), &biome_title(name))
+            horizon_client::lang::get_or(
+                &resource_translation_key("biome", name),
+                &biome_title(name),
+            )
         })
         .unwrap_or_default()
 }
@@ -24,14 +27,18 @@ fn armor_points(game: &crate::game::Game<'_>, item: Option<&str>) -> f32 {
     };
     info.modifiers
         .iter()
-        .filter(|(attribute, ..)| attribute == "minecraft:armor" || attribute == "armor")
-        .map(|(_, _, amount, _, _)| *amount as f32)
+        .filter(|modifier| modifier.attribute == "minecraft:armor" || modifier.attribute == "armor")
+        .map(|modifier| modifier.amount as f32)
         .sum()
 }
 /// `ItemStackScoreUtil.a`: a sword's or tool's default attack-damage
 /// modifiers (any slot), 0 for anything else.
-fn weapon_bonus(game: &crate::game::Game<'_>, stack: Option<&horizon_client::items::ItemStack>) -> f32 {
-    let Some((id, info)) = stack.and_then(|s| game.res.items().get(&s.item).map(|i| (&*s.item, i))) else {
+fn weapon_bonus(
+    game: &crate::game::Game<'_>,
+    stack: Option<&horizon_client::items::ItemStack>,
+) -> f32 {
+    let Some((id, info)) = stack.and_then(|s| game.res.items().get(&s.item).map(|i| (&*s.item, i)))
+    else {
         return 0.0;
     };
     if !id.ends_with("_sword") && !info.components.iter().any(|c| c == "minecraft:tool") {
@@ -39,8 +46,10 @@ fn weapon_bonus(game: &crate::game::Game<'_>, stack: Option<&horizon_client::ite
     }
     info.modifiers
         .iter()
-        .filter(|(attribute, ..)| attribute == "minecraft:attack_damage" || attribute == "attack_damage")
-        .map(|(_, _, amount, _, _)| *amount as f32)
+        .filter(|modifier| {
+            modifier.attribute == "minecraft:attack_damage" || modifier.attribute == "attack_damage"
+        })
+        .map(|modifier| modifier.amount as f32)
         .sum()
 }
 /// What `RotationUtil.j` reads from one side: the held stack's Sharpness and
@@ -61,7 +70,9 @@ fn fighter(
 }
 /// The local player's side of `RotationUtil.y` and its attack-damage
 /// attribute (`b` reads the local player's for both sides).
-fn own_fighter(game: &crate::game::Game<'_>) -> (crate::game::vape_rs::ui::target_info::Fighter, Option<f32>) {
+fn own_fighter(
+    game: &crate::game::Game<'_>,
+) -> (crate::game::vape_rs::ui::target_info::Fighter, Option<f32>) {
     let held = game.inventory.get(game.selected).and_then(|s| s.as_ref());
     let armor = game
         .armor
@@ -94,13 +105,19 @@ pub(super) fn heal_potion(stack: &horizon_client::items::ItemStack) -> bool {
         return false;
     }
     let heals = |effect: &str| {
-        matches!(effect.strip_prefix("minecraft:").unwrap_or(effect), "instant_health" | "regeneration")
+        matches!(
+            effect.strip_prefix("minecraft:").unwrap_or(effect),
+            "instant_health" | "regeneration"
+        )
     };
     stack
         .potion()
         .and_then(horizon_client::brewing::potion)
         .is_some_and(|d| d.effects.iter().any(|(effect, _, _)| heals(effect)))
-        || stack.custom_potion_effects().iter().any(|(effect, _, _)| heals(effect))
+        || stack
+            .custom_potion_effects()
+            .iter()
+            .any(|(effect, _, _)| heals(effect))
 }
 /// Target Info runs on the player's game, not on a server thread's.
 fn target_pots_skip(game: &crate::game::Game<'_>) -> bool {
@@ -109,11 +126,17 @@ fn target_pots_skip(game: &crate::game::Game<'_>) -> bool {
 /// `TargetInfoHudModule.onPlayerUseItem`: the local player used a heal
 /// potion (`use_potion_item` in a local world, `remote_use_item` on a
 /// server). A drink counts when its use starts.
-pub(super) fn target_heal_used(game: &crate::game::Game<'_>, stack: Option<&horizon_client::items::ItemStack>) {
+pub(super) fn target_heal_used(
+    game: &crate::game::Game<'_>,
+    stack: Option<&horizon_client::items::ItemStack>,
+) {
     let Some(stack) = stack else {
         return;
     };
-    if target_pots_skip(game) || (&*stack.item == "minecraft:potion" && game.using.is_some()) || !heal_potion(stack) {
+    if target_pots_skip(game)
+        || (&*stack.item == "minecraft:potion" && game.using.is_some())
+        || !heal_potion(stack)
+    {
         return;
     }
     let client = crate::game::vape_rs::core::client().clone();
@@ -123,7 +146,10 @@ pub(super) fn target_heal_used(game: &crate::game::Game<'_>, stack: Option<&hori
 /// `launch_thrown` in a local world; from a server, when the potion
 /// entity's item first arrives (its spawn carries no item: the stack comes
 /// in its entity data right after).
-pub(super) fn target_heal_joined(game: &crate::game::Game<'_>, stack: &horizon_client::items::ItemStack) {
+pub(super) fn target_heal_joined(
+    game: &crate::game::Game<'_>,
+    stack: &horizon_client::items::ItemStack,
+) {
     if target_pots_skip(game) || !heal_potion(stack) {
         return;
     }
@@ -133,7 +159,11 @@ pub(super) fn target_heal_joined(game: &crate::game::Game<'_>, stack: &horizon_c
 /// The remote side of [`target_heal_joined`]: a thrown potion's item
 /// (`ThrowableItemProjectile.DATA_ITEM_STACK`, index 8) counts once, when
 /// the stack the host knew for it was not yet a heal potion.
-pub(super) fn target_remote_potion(game: &crate::game::Game<'_>, id: i32, stack: Option<horizon_client::items::ItemStack>) {
+pub(super) fn target_remote_potion(
+    game: &crate::game::Game<'_>,
+    id: i32,
+    stack: Option<horizon_client::items::ItemStack>,
+) {
     let Some(stack) = stack else {
         return;
     };
@@ -176,18 +206,23 @@ fn seen_mob(
     let player = &*mob.kind.id == "minecraft:player";
     let extra = &mob.extra;
     let armor = if player {
-        [&extra.head, &extra.chest, &extra.legs, &extra.feet]
-            .into_iter()
-            .map(|item| armor_points(game, item.as_deref()))
-            .sum()
+        [
+            extra.head_id(),
+            extra.slot_id(horizon_items::equipment::CHEST),
+            extra.slot_id(horizon_items::equipment::LEGS),
+            extra.slot_id(horizon_items::equipment::FEET),
+        ]
+        .into_iter()
+        .map(|item| armor_points(game, item))
+        .sum()
     } else {
         0.0
     };
     let resistance = extra
         .effects
         .iter()
-        .find(|(id, ..)| *id == "minecraft:resistance" || *id == "resistance")
-        .map(|(_, _, amplifier)| *amplifier);
+        .find(|effect| effect.id == "minecraft:resistance" || effect.id == "resistance")
+        .map(|effect| effect.amplifier);
     let target = fighter(game, extra.main_hand_stack(), armor, resistance);
     let (me, attack) = own_fighter(game);
     crate::game::vape_rs::ui::target_info::Seen {
@@ -207,10 +242,12 @@ fn crosshair_mob<'a>(game: &'a crate::game::Game<'_>) -> Option<&'a horizon_clie
     crosshair_hit(game).map(|(m, _)| m)
 }
 /// The crosshair entity and the eye-to-hitbox distance along the look ray.
-fn crosshair_hit<'a>(game: &'a crate::game::Game<'_>) -> Option<(&'a horizon_client::mobs::Mob, f64)> {
+fn crosshair_hit<'a>(
+    game: &'a crate::game::Game<'_>,
+) -> Option<(&'a horizon_client::mobs::Mob, f64)> {
     game.mob_hit()
-        .filter(|(_, d)| game.before_block(*d))
-        .and_then(|(i, d)| game.mobs.get(i).map(|m| (m, d)))
+        .filter(|(_, d, _)| game.before_block(*d))
+        .and_then(|(i, d, _)| game.mobs.get(i).map(|m| (m, d)))
         .filter(|(m, _)| m.alive() && &*m.kind.id != "minecraft:armor_stand")
 }
 /// Attack HEAD (`EventPostAttack` on this host): the crosshair entity
@@ -231,7 +268,8 @@ pub(super) fn target_attack(game: &crate::game::Game<'_>) {
 fn target_feed(game: &crate::game::Game<'_>) -> crate::game::vape_rs::ui::target_info::Feed {
     use crate::game::vape_rs::ui::target_info::{Feed, Seen};
     let client = crate::game::vape_rs::core::client().clone();
-    let tracked_id = crate::game::vape_rs::core::with_client(&client, |runtime| runtime.target_info_id());
+    let tracked_id =
+        crate::game::vape_rs::core::with_client(&client, |runtime| runtime.target_info_id());
     let names = game.remote_player_names();
     let tracked = tracked_id.and_then(|id| {
         game.mobs
@@ -260,7 +298,10 @@ fn target_feed(game: &crate::game::Game<'_>) -> crate::game::vape_rs::ui::target
     Feed {
         hovered: crosshair_mob(game).map(|m| seen_mob(game, m, &names)),
         tracked,
-        own_hurt_time: game.player.as_ref().map_or(0, |p| p.health.hurt_animation_time),
+        own_hurt_time: game
+            .player
+            .as_ref()
+            .map_or(0, |p| p.health.hurt_animation_time),
         own,
     }
 }
@@ -301,7 +342,7 @@ pub(super) fn snapshot(
         .map(|effect| {
             let icon = horizon_client::hud_overlays::EffectIcon::from(effect);
             PotionView {
-                id: icon.id,
+                id: icon.id.clone(),
                 name: horizon_client::lang::get_or(
                     &resource_translation_key("effect", effect.id),
                     &biome_title(effect.id),
@@ -310,7 +351,10 @@ pub(super) fn snapshot(
                 maximum: effect.duration,
                 negative: !icon.beneficial,
                 amplifier: effect.amplifier,
-                color: 0xff000000 | (icon.color as u32 & 0xffffff),
+                color: 0xff000000
+                    | (horizon_client::brewing::effect(&icon.id)
+                        .map_or(0, |effect| effect.shown_color())
+                        & 0xffffff),
             }
         })
         .collect();
@@ -335,7 +379,7 @@ pub(super) fn snapshot(
             KeyCode::KeyD,
             KeyCode::Space,
         ]
-        .map(|k| game.keys.contains(&k)),
+        .map(|k| game.keys.raw(&k)),
         mouse: [game.left, game.right],
         armor,
         effects,
@@ -385,9 +429,10 @@ pub(super) fn panel(game: &crate::game::Game<'_>, batch: &mut HudBatch, panel: &
     if let crate::game::vape_rs::ui::hud::Content::TextGui(view) = &panel.content {
         let (rect, rows) = text_gui(atlas, batch, panel, view);
         // Click disable hit-tests these boxes on the next GUI click.
-        crate::game::vape_rs::core::with_client(&crate::game::vape_rs::core::client().clone(), |r| {
-            r.set_text_gui_boxes(rows)
-        });
+        crate::game::vape_rs::core::with_client(
+            &crate::game::vape_rs::core::client().clone(),
+            |r| r.set_text_gui_boxes(rows),
+        );
         return rect;
     }
     if let crate::game::vape_rs::ui::hud::Content::TargetInfo(view) = &panel.content {
@@ -621,7 +666,15 @@ fn text_gui(
                     let (tx, ty) = (x + dx + offset, y + dy + offset);
                     let abgr = color(argb, panel.enabled);
                     if view.smooth {
-                        super::vape_smooth_text::text(&mut ui, &text, tx, ty, TEXT_EM * size, 8.0 * size, abgr);
+                        super::vape_smooth_text::text(
+                            &mut ui,
+                            &text,
+                            tx,
+                            ty,
+                            TEXT_EM * size,
+                            8.0 * size,
+                            abgr,
+                        );
                     } else {
                         let first = ui.batch.vertices.len();
                         ui.batch.text(atlas, &text, tx, ty, abgr, false);
@@ -655,7 +708,13 @@ fn target_info(
     let y = panel.y.clamp(0.0, (ui.batch.height - h).max(0.0));
     for draw in out.draws {
         match draw {
-            Draw::Fill { x: dx, y: dy, w, h, color: argb } => ui.batch.fill(
+            Draw::Fill {
+                x: dx,
+                y: dy,
+                w,
+                h,
+                color: argb,
+            } => ui.batch.fill(
                 atlas,
                 x + dx * s,
                 y + dy * s,
@@ -663,7 +722,15 @@ fn target_info(
                 h * s,
                 color(argb, panel.enabled),
             ),
-            Draw::Text { x: dx, y: dy, size, text, color: argb, .. } => super::vape_smooth_text::text(&mut ui,
+            Draw::Text {
+                x: dx,
+                y: dy,
+                size,
+                text,
+                color: argb,
+                ..
+            } => super::vape_smooth_text::text(
+                &mut ui,
                 &text,
                 x + dx * s,
                 y + dy * s,
@@ -677,10 +744,25 @@ fn target_info(
     // `TargetInfoEntityPreviewComponent`: a player's 12x12 face (skin
     // u 8..16, no hat layer) in white at the panel's alpha, drawn with the
     // host's own skin sprite like the tab list.
-    if let (Some((fx, fy)), Some(skin)) = (crate::game::vape_rs::ui::target_info::face_origin(view), &view.skin) {
+    if let (Some((fx, fy)), Some(skin)) = (
+        crate::game::vape_rs::ui::target_info::face_origin(view),
+        &view.skin,
+    ) {
         use horizon_client::hud_layout::{GuiDraw, PoseOp};
-        let mut face = vec![GuiDraw::Push(vec![PoseOp::Translate(x + fx * s, y + fy * s), PoseOp::Scale(s, s)])];
-        horizon_client::tab_list::face(&mut face, skin, 0, 0, 12, false, false, color(0xffffffff, panel.enabled));
+        let mut face = vec![GuiDraw::Push(vec![
+            PoseOp::Translate(x + fx * s, y + fy * s),
+            PoseOp::Scale(s, s),
+        ])];
+        horizon_client::tab_list::face(
+            &mut face,
+            skin,
+            0,
+            0,
+            12,
+            false,
+            false,
+            color(0xffffffff, panel.enabled),
+        );
         face.push(GuiDraw::Pop);
         horizon_client::hud_layout::paint(batch, atlas, &face);
     }
@@ -703,7 +785,9 @@ pub(super) fn drop_paused_title(game: &crate::game::Game<'_>, batch: &mut HudBat
         return;
     }
     let atlas = &game.gui.atlas;
-    let title = game.translate("menu.paused", "Game Paused");
+    let title = game
+        .translate("menu.paused")
+        .unwrap_or_else(|| "Game Paused".to_owned());
     let tw = HudBatch::text_width(atlas, &title);
     let end = batch.vertices.len();
     let x = ((batch.width / 2.0).floor() - (tw / 2.0).floor()).floor();
@@ -735,13 +819,36 @@ pub(super) fn notifications(game: &crate::game::Game<'_>, batch: &mut HudBatch) 
     let screen = (batch.width, batch.height);
     let mut ui = horizon_client::ui_theme::Ui::new(atlas, batch, (0.0, 0.0));
     let draws = crate::game::vape_rs::core::with_client(&client, |runtime| {
-        runtime.notification_frame(screen, |text, size| super::vape_smooth_text::measure(&ui, text, TEXT_EM * size))
+        runtime.notification_frame(screen, |text, size| {
+            super::vape_smooth_text::measure(&ui, text, TEXT_EM * size)
+        })
     });
     for draw in draws {
         match draw {
-            Draw::Fill { x, y, w, h, color: argb } => ui.batch.fill(atlas, x, y, w, h, color(argb, true)),
-            Draw::Text { x, y, size, text, color: argb, .. } => {
-                super::vape_smooth_text::text(&mut ui, &text, x, y, TEXT_EM * size, 8.0 * size, color(argb, true));
+            Draw::Fill {
+                x,
+                y,
+                w,
+                h,
+                color: argb,
+            } => ui.batch.fill(atlas, x, y, w, h, color(argb, true)),
+            Draw::Text {
+                x,
+                y,
+                size,
+                text,
+                color: argb,
+                ..
+            } => {
+                super::vape_smooth_text::text(
+                    &mut ui,
+                    &text,
+                    x,
+                    y,
+                    TEXT_EM * size,
+                    8.0 * size,
+                    color(argb, true),
+                );
             }
         }
     }
@@ -816,15 +923,23 @@ pub(super) fn sidebar(
 }
 
 /// Scoreboard: the sidebar painted at the panel's position.
-fn scoreboard(game: &crate::game::Game<'_>, batch: &mut HudBatch, panel: &HudPanel) -> Option<Rect> {
+fn scoreboard(
+    game: &crate::game::Game<'_>,
+    batch: &mut HudBatch,
+    panel: &HudPanel,
+) -> Option<Rect> {
     use horizon_client::hud_layout::{GuiDraw, PoseOp};
     let (numbers, replacements) = {
         let client = crate::game::vape_rs::core::client().clone();
         crate::game::vape_rs::core::with_client(&client, |runtime| {
-            (runtime.scoreboard_numbers(), runtime.scoreboard_replacements())
+            (
+                runtime.scoreboard_numbers(),
+                runtime.scoreboard_replacements(),
+            )
         })
     };
-    let (mut draws, [left, top, right, bottom]) = sidebar(game, batch.width, batch.height, numbers)?;
+    let (mut draws, [left, top, right, bottom]) =
+        sidebar(game, batch.width, batch.height, numbers)?;
     // At or above 1.16.5 `renderScoreboard` draws the rows and the title
     // components unreplaced; the replaced title only sets the centring.
     if let Some(GuiDraw::Text { text, x, .. }) = draws.get_mut(2)
@@ -835,14 +950,18 @@ fn scoreboard(game: &crate::game::Game<'_>, batch: &mut HudBatch, panel: &HudPan
         let replaced = crate::game::vape_rs::ui::scoreboard::replace_all(&replacements, &plain);
         // The host centred the title by its own width (`title_width`).
         let original = horizon_client::hud_layout::width(font, text);
-        let shown = horizon_client::hud_layout::width(font, &horizon_client::text::Text::legacy(&replaced));
+        let shown =
+            horizon_client::hud_layout::width(font, &horizon_client::text::Text::legacy(&replaced));
         *x += original / 2 - shown / 2;
     }
     let (w, h) = ((right - left) as f32, (bottom - top) as f32);
     let x = panel.x.clamp(0.0, (batch.width - w).max(0.0));
     let y = panel.y.clamp(0.0, (batch.height - h).max(0.0));
     let mut moved = Vec::with_capacity(draws.len() + 2);
-    moved.push(GuiDraw::Push(vec![PoseOp::Translate(x - left as f32, y - top as f32)]));
+    moved.push(GuiDraw::Push(vec![PoseOp::Translate(
+        x - left as f32,
+        y - top as f32,
+    )]));
     moved.extend(draws);
     moved.push(GuiDraw::Pop);
     horizon_client::hud_layout::paint(batch, &game.gui.atlas, &moved);

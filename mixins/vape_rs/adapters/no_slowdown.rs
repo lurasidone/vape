@@ -1,4 +1,5 @@
 fn no_slowdown(world: &mut crate::motion::MotionWorld<'_, '_, '_>) {
+    use crate::game::vape_current_support::PlayerMotionExt;
     if world.player.vape_rs_no_slowdown() {
         world.player.item_use_speed = None;
         // NoSlowdown with Sprint on keeps sprinting while using the item.

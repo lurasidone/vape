@@ -23,10 +23,10 @@ fn gui_events(
         match event {
             WindowEvent::CursorMoved { position, .. } => {
                 if let Some(renderer) = &game.renderer {
-                    let batch = horizon_client::hud::HudBatch::new([
-                        renderer.config.width,
-                        renderer.config.height,
-                    ]);
+                    let batch = horizon_client::hud::HudBatch::new(
+                        [renderer.config.width, renderer.config.height],
+                        game.settings.gui_scale_inputs(),
+                    );
                     runtime.gui_pointer((
                         position.x as f32 / batch.scale,
                         position.y as f32 / batch.scale,
