@@ -2526,6 +2526,14 @@ world or credentials were used.
 
 This proves the full Rust runtime payload can be compiled into a current-nightly
 native mod and its first client-tick integration executes in a rendered game.
-It does not port the existing gameplay hooks, HUD/UI or feature set to this
-SDK: the current probe manifest and adapter remain disposable `target/`
-artifacts. Keep all feature rows and overall completion status unchanged.
+The current-SDK client-tick adapter is now tracked at
+`mixins/vape_rs/adapters/current_tick.rs`. `tools/native_sdk_project.py`
+generates the disposable launcher project from the signed SDK's `sdk.json`
+after `cargo run --offline -p xtask -- pack`; no hand-edited probe manifest is
+needed. Rebuilt as `native-f1bb66f-122660d9e176` from that generated project,
+then reran the fresh-home smoke: **1,582 frames, 117 chunks, 2,268 meshed
+sections, a player, no error**, with the same runtime-ready and session logs.
+Evidence is under ignored `target/scenarios/sdk-nightly-vape-repro/`.
+
+This does not port the existing gameplay hooks, HUD/UI or feature set to this
+SDK. Keep all feature rows and overall completion status unchanged.
