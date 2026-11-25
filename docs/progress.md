@@ -2593,6 +2593,17 @@ zero errors. After adding the current-SDK Timer hook, build
 `native-f1bb66f-8ab35b5b501f` compiled the fractional-carry reset when Timer
 returns to `1.0`; that cleanup build has not yet had its own host run.
 
+After that build, launched its installed `horizon-client` with its adjacent
+`horizon-ctl` in a new isolated scenario at
+`target/scenarios/sdk-final-game-pgwdt7jg/`, using the already-prepared 26.3
+resources read-only from the earlier Timer scenario. Horizon loaded one native
+mod, generated `native-mods/vape-rs/current.json` and local profiles, opened
+`VapeFinalBuildSmoke`, reached the playing screen with 30 client ticks and 44
+chunks loaded, answered `status` and `state`, captured an 800x600 screenshot,
+and exited cleanly through `horizon-ctl quit`. This confirms the final cleanup
+build itself can run a local game; the Timer speed comparison below remains
+from build `native-f1bb66f-a7a314f09990`.
+
 Ran that built version with `horizon-ctl` in a fresh isolated scenario at
 `target/scenarios/sdk-full-horizon-ctl-final-tq_7jz2j/` (fresh game, launcher,
 XDG-data and XDG-config homes, and a new local world; no account, player data,
