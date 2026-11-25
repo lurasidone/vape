@@ -10,6 +10,7 @@ thread_local! {
     static INV_WALK: Cell<(usize, Option<crate::sprint::Keys>)> = const { Cell::new((0, None)) };
     static SPRINT: Cell<usize> = const { Cell::new(0) };
     static TIMER: Cell<(usize, f32)> = const { Cell::new((0, 1.0)) };
+    static TIMER_FRACTION: Cell<(usize, f32)> = const { Cell::new((0, 0.0)) };
     static TIMER_REENTRY: Cell<bool> = const { Cell::new(false) };
 }
 
@@ -192,6 +193,7 @@ fn ray_box(eye: [f64; 3], dir: [f64; 3], reach: f64, min: [f64; 3], max: [f64; 3
 pub trait FixedStepExt {
     fn vape_rs_set_timer_speed(&self, speed: f32);
     fn vape_rs_timer_speed(&self) -> Option<f32>;
+    fn vape_rs_timer_steps(&self, steps: u32) -> u32;
     fn vape_rs_advance_scaled(
         &mut self,
         elapsed: std::time::Duration,
@@ -209,6 +211,13 @@ impl FixedStepExt for crate::clock::FixedStep {
                 cell.set((0, 1.0))
             }
         });
+        if speed == 1.0 {
+            TIMER_FRACTION.with(|cell| {
+                if cell.get().0 == id {
+                    cell.set((id, 0.0));
+                }
+            });
+        }
     }
     fn vape_rs_timer_speed(&self) -> Option<f32> {
         if TIMER_REENTRY.with(Cell::get) {
@@ -217,6 +226,18 @@ impl FixedStepExt for crate::clock::FixedStep {
         TIMER.with(|cell| {
             let (id, speed) = cell.get();
             (id == self as *const Self as usize && speed != 1.0).then_some(speed)
+        })
+    }
+    fn vape_rs_timer_steps(&self, steps: u32) -> u32 {
+        let speed = self.vape_rs_timer_speed().unwrap_or(1.0).max(0.0);
+        let id = self as *const Self as usize;
+        TIMER_FRACTION.with(|cell| {
+            let (owner, fraction) = cell.get();
+            let fraction = if owner == id { fraction } else { 0.0 };
+            let ticks = (steps as f32 * speed + fraction).floor();
+            let ticks = ticks.clamp(0.0, u32::MAX as f32) as u32;
+            cell.set((id, steps as f32 * speed + fraction - ticks as f32));
+            ticks
         })
     }
     fn vape_rs_advance_scaled(

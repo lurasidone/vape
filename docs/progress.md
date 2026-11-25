@@ -2575,9 +2575,11 @@ and clock types into a library crate, so the mod cannot add inherent methods
 to them. `mixins/vape_rs/current_support.rs` carries those per-thread marks
 through local extension traits in the game crate. Updated current equipment,
 attribute, LAN guest, projectile, fog and UI call sites to the SDK's current
-interfaces. A Timer `FixedStep::advance` hook is still unavailable because the
-current native planner does not index that library-crate function; Timer
-scaling remains unvalidated on this SDK.
+interfaces. The current native planner cannot patch the library-crate
+`FixedStep::advance` method or find that call inside the frame closure. The
+full manifest instead modifies the `steps` parameter at the game's
+`client_tick_steps` entry and carries fractional ticks between frames, keeping
+its movement on the current game crate.
 
 Added `--full` to `tools/native_sdk_project.py` and checked in
 `tools/current_native_full_manifest.toml` so the candidate uses the complete
@@ -2586,8 +2588,10 @@ project. Regenerated it from the signed SDK metadata and built through the
 user's Horizon launcher `0.2.108`. The launcher reported
 `Your mods are built` and produced/selected
 `native-f1bb66f-f1ab7d97848c`; the patched-functions compiler finished with
-zero errors. Re-running the generator and build reproduced that same build
-identity.
+zero errors. After adding the current-SDK Timer hook, build
+`native-f1bb66f-a7a314f09990` compiled with zero errors. The follow-up build
+`native-f1bb66f-8ab35b5b501f` compiled the fractional-carry reset when Timer
+returns to `1.0`; that cleanup build has not yet had its own host run.
 
 Ran that built version with `horizon-ctl` in a fresh isolated scenario at
 `target/scenarios/sdk-full-horizon-ctl-final-tq_7jz2j/` (fresh game, launcher,
@@ -2597,6 +2601,12 @@ reached 38 client ticks with 49 chunks loaded, returned live `status` and
 `state`, captured an 800x600 screenshot, and shut down cleanly. The installed
 version metadata identifies the loaded `vape_rs` native mod, and the run
 created its local runtime configuration and profile files. This validates the
-full candidate's build and startup integration; it does not validate the
-individual gameplay features or the missing Timer scaling hook. No feature
-ledger row changed.
+full candidate's build and startup integration. Then ran Timer host scenarios
+on build `native-f1bb66f-a7a314f09990` in separate fresh isolated homes:
+with Timer disabled, `horizon-ctl wait 40` took **2.001 s**; with Timer enabled
+at speed `2.0`, the same 40 game ticks took **0.991 s**. The enabled run used
+`target/scenarios/sdk-timer-horizon-ctl-lt3qtumb/`; the disabled control used
+`target/scenarios/sdk-timer-control-1popvnko/`. Both sessions loaded a world
+and quit cleanly. The measured rate changed from 20 to about 40 ticks/s, as
+configured. This validates Timer's current-SDK tick scaling; other gameplay
+features still need their own host scenarios. No feature-ledger row changed.

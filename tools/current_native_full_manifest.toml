@@ -82,6 +82,19 @@ name = "vape_current_support"
 source = "src/current_support.rs"
 
 [[native.mixin]]
+id = "current-timer-steps"
+target = "horizon_client::game::client_tick_steps::Game<'_>::client_tick_steps"
+kind = "MODIFY_VARIABLE"
+variable = { name = "steps", ordinal = 0, at = "LOAD", parameter = true }
+ordinal = 0
+require = 1
+helper = "src/adapters/current_timer_steps.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "steps", ty = "u32", value = "$value" },
+]
+
+[[native.mixin]]
 id = "client-input"
 target = "horizon_client::game::debug_keys::Game<'_>::debug_key"
 kind = "HEAD"
