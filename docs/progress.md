@@ -2591,7 +2591,7 @@ user's Horizon launcher `0.2.108`. The launcher reported
 zero errors. After adding the current-SDK Timer hook, build
 `native-f1bb66f-a7a314f09990` compiled with zero errors. The follow-up build
 `native-f1bb66f-8ab35b5b501f` compiled the fractional-carry reset when Timer
-returns to `1.0`; that cleanup build has not yet had its own host run.
+returns to `1.0`.
 
 After that build, launched its installed `horizon-client` with its adjacent
 `horizon-ctl` in a new isolated scenario at
@@ -2601,8 +2601,7 @@ mod, generated `native-mods/vape-rs/current.json` and local profiles, opened
 `VapeFinalBuildSmoke`, reached the playing screen with 30 client ticks and 44
 chunks loaded, answered `status` and `state`, captured an 800x600 screenshot,
 and exited cleanly through `horizon-ctl quit`. This confirms the final cleanup
-build itself can run a local game; the Timer speed comparison below remains
-from build `native-f1bb66f-a7a314f09990`.
+build itself can run a local game.
 
 Ran that built version with `horizon-ctl` in a fresh isolated scenario at
 `target/scenarios/sdk-full-horizon-ctl-final-tq_7jz2j/` (fresh game, launcher,
@@ -2618,6 +2617,12 @@ with Timer disabled, `horizon-ctl wait 40` took **2.001 s**; with Timer enabled
 at speed `2.0`, the same 40 game ticks took **0.991 s**. The enabled run used
 `target/scenarios/sdk-timer-horizon-ctl-lt3qtumb/`; the disabled control used
 `target/scenarios/sdk-timer-control-1popvnko/`. Both sessions loaded a world
-and quit cleanly. The measured rate changed from 20 to about 40 ticks/s, as
-configured. This validates Timer's current-SDK tick scaling; other gameplay
-features still need their own host scenarios. No feature-ledger row changed.
+and quit cleanly. Repeated the same comparison on final build
+`native-f1bb66f-8ab35b5b501f`: Timer disabled took **1.998 s** and enabled at
+speed `2.0` took **0.999 s**, in fresh isolated scenarios
+`target/scenarios/sdk-timer-final-off-l5e3oqvb/` and
+`target/scenarios/sdk-timer-final-on-ir2ajoid/`. Each run advanced exactly 40
+client ticks, loaded the mod, and quit cleanly. The measured rate doubled as
+configured. This validates Timer's current-SDK tick scaling, including the
+final fractional-carry reset build; other gameplay features still need their
+own host scenarios. No feature-ledger row changed.
