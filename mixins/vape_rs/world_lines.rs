@@ -270,7 +270,7 @@ pub(crate) fn overlay_target(game: &Game<'_>) -> Vec<[f64; 6]> {
 }
 
 pub(crate) fn fishing_line(game: &Game<'_>, alpha: f64, size: [u32; 2]) -> ControlFlow<Vec<Line>> {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (storage_on, entities_on, scene_on, (explosions_on, overlay_on), epoch) = with_client(&client, |runtime| {
         let (s, e) = runtime.world_line_sources();
         (s, e, runtime.scene_active(), runtime.depth_active(), runtime.session().epoch())

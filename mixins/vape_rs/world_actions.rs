@@ -139,7 +139,7 @@ fn on_ladder(game: &mut Game<'_>) -> bool {
 
 /// The movement writer's requests from these modules.
 pub(crate) fn requests(game: &mut Game<'_>, active: bool, again: bool, view: &HostView) -> Vec<Request> {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let mut out = Vec::new();
     // NoFall Normal released jump on a claimed landing; it stays released
     // until the user lets go of jump.
@@ -208,7 +208,7 @@ pub(crate) fn tick(game: &mut Game<'_>) {
     if game.player.is_none() {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     // AutoTotem's silent open holds the movement keys (and attack/use) from
     // the open until one "Silent move delay" after its close.
     let totem_hold = with_client(&client, |runtime| runtime.auto_totem_tick(std::time::Instant::now()));

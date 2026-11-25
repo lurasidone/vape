@@ -92,7 +92,7 @@ pub(super) fn auto_tool(game: &mut Game<'_>, attack_event: bool) {
     {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (enabled, epoch, tick, guard, keys) = with_client(&client, |runtime| {
         let guard = runtime
             .settings()

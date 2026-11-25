@@ -2548,3 +2548,21 @@ This does not port the existing gameplay hooks, HUD/UI or feature set to this
 SDK. This HUD uses fixed positions and Horizon's bitmap font, without the full
 layout, styling, configuration or other module panels. Keep all feature rows
 and overall completion status unchanged.
+
+## 2026-11-25: use the public text batch API on the current SDK
+
+The nightly SDK keeps `ui_theme::Ui::{measure,text_line}` crate-private, so the
+old support module could not add methods to `Ui` or call those internals from
+the mod crate. Replaced those calls with a mod-owned adapter that measures and
+draws scaled glyph cells through the public `HudAtlas::glyph_cell` and
+`HudBatch::rect_uv` APIs. GUI editor and HUD text now compile through the
+current SDK's public surface without an inherent implementation on an
+external type.
+
+Validation: rebuilt the full current-nightly candidate using the signed
+`f1bb66f353cf67f2aa4665293fc75c8d91186fc7` SDK and launcher `0.2.108` in the
+isolated home `target/scenarios/sdk-full-candidate/`. Rust compilation moved
+past all former text adapter errors; the remaining unrelated API drift is
+still **117 compiler errors**, so this is not a successful mod/game build.
+No feature-ledger rows changed and no game scenario was possible from this
+candidate.

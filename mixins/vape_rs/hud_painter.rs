@@ -116,7 +116,7 @@ pub(super) fn target_heal_used(game: &crate::game::Game<'_>, stack: Option<&hori
     if target_pots_skip(game) || (&*stack.item == "minecraft:potion" && game.using.is_some()) || !heal_potion(stack) {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     crate::game::vape_rs::core::with_client(&client, |runtime| runtime.target_info_heal_used());
 }
 /// `TargetInfoHudModule.onEntityJoinWorld` for a thrown heal potion: at
@@ -127,7 +127,7 @@ pub(super) fn target_heal_joined(game: &crate::game::Game<'_>, stack: &horizon_c
     if target_pots_skip(game) || !heal_potion(stack) {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     crate::game::vape_rs::core::with_client(&client, |runtime| runtime.target_info_heal_joined());
 }
 /// The remote side of [`target_heal_joined`]: a thrown potion's item
@@ -222,7 +222,7 @@ pub(super) fn target_attack(game: &crate::game::Game<'_>) {
         return;
     };
     let seen = seen_mob(game, mob, &game.remote_player_names());
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     crate::game::vape_rs::core::with_client(&client, |runtime| {
         runtime.target_info_attack(seen);
         runtime.reach_display_attack(distance as f32);
@@ -230,7 +230,7 @@ pub(super) fn target_attack(game: &crate::game::Game<'_>) {
 }
 fn target_feed(game: &crate::game::Game<'_>) -> crate::game::vape_rs::ui::target_info::Feed {
     use crate::game::vape_rs::ui::target_info::{Feed, Seen};
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let tracked_id = crate::game::vape_rs::core::with_client(&client, |runtime| runtime.target_info_id());
     let names = game.remote_player_names();
     let tracked = tracked_id.and_then(|id| {
@@ -385,7 +385,7 @@ pub(super) fn panel(game: &crate::game::Game<'_>, batch: &mut HudBatch, panel: &
     if let crate::game::vape_rs::ui::hud::Content::TextGui(view) = &panel.content {
         let (rect, rows) = text_gui(atlas, batch, panel, view);
         // Click disable hit-tests these boxes on the next GUI click.
-        crate::game::vape_rs::core::with_client(&game.__horizon_mixins_vape_rs_client().clone(), |r| {
+        crate::game::vape_rs::core::with_client(&crate::game::vape_rs::core::client().clone(), |r| {
             r.set_text_gui_boxes(rows)
         });
         return rect;
@@ -572,7 +572,7 @@ fn text_gui(
     let mut ui = horizon_client::ui_theme::Ui::new(atlas, batch, (0.0, 0.0));
     let measure = |text: &str, size: f32| {
         if view.smooth {
-            ui.vape_rs_measure(text, TEXT_EM * size)
+            super::vape_smooth_text::measure(&ui, text, TEXT_EM * size)
         } else {
             HudBatch::text_width(atlas, text) * size
         }
@@ -621,7 +621,7 @@ fn text_gui(
                     let (tx, ty) = (x + dx + offset, y + dy + offset);
                     let abgr = color(argb, panel.enabled);
                     if view.smooth {
-                        ui.vape_rs_text(&text, tx, ty, TEXT_EM * size, 8.0 * size, abgr);
+                        super::vape_smooth_text::text(&mut ui, &text, tx, ty, TEXT_EM * size, 8.0 * size, abgr);
                     } else {
                         let first = ui.batch.vertices.len();
                         ui.batch.text(atlas, &text, tx, ty, abgr, false);
@@ -648,7 +648,7 @@ fn target_info(
     let start = batch.vertices.len();
     let mut ui = horizon_client::ui_theme::Ui::new(atlas, batch, (0.0, 0.0));
     let out = crate::game::vape_rs::ui::target_info::layout(view, |text, size| {
-        ui.vape_rs_measure(text, TEXT_EM * size)
+        super::vape_smooth_text::measure(&ui, text, TEXT_EM * size)
     });
     let (w, h) = (out.width * s, out.height * s);
     let x = panel.x.clamp(0.0, (ui.batch.width - w).max(0.0));
@@ -663,7 +663,7 @@ fn target_info(
                 h * s,
                 color(argb, panel.enabled),
             ),
-            Draw::Text { x: dx, y: dy, size, text, color: argb, .. } => ui.vape_rs_text(
+            Draw::Text { x: dx, y: dy, size, text, color: argb, .. } => super::vape_smooth_text::text(&mut ui,
                 &text,
                 x + dx * s,
                 y + dy * s,
@@ -729,19 +729,19 @@ pub(super) fn drop_paused_title(game: &crate::game::Game<'_>, batch: &mut HudBat
 pub(super) fn notifications(game: &crate::game::Game<'_>, batch: &mut HudBatch) {
     use crate::game::vape_rs::ui::text_gui::Draw;
     const TEXT_EM: f32 = 9.0;
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let atlas = &game.gui.atlas;
     let start = batch.vertices.len();
     let screen = (batch.width, batch.height);
     let mut ui = horizon_client::ui_theme::Ui::new(atlas, batch, (0.0, 0.0));
     let draws = crate::game::vape_rs::core::with_client(&client, |runtime| {
-        runtime.notification_frame(screen, |text, size| ui.vape_rs_measure(text, TEXT_EM * size))
+        runtime.notification_frame(screen, |text, size| super::vape_smooth_text::measure(&ui, text, TEXT_EM * size))
     });
     for draw in draws {
         match draw {
             Draw::Fill { x, y, w, h, color: argb } => ui.batch.fill(atlas, x, y, w, h, color(argb, true)),
             Draw::Text { x, y, size, text, color: argb, .. } => {
-                ui.vape_rs_text(&text, x, y, TEXT_EM * size, 8.0 * size, color(argb, true));
+                super::vape_smooth_text::text(&mut ui, &text, x, y, TEXT_EM * size, 8.0 * size, color(argb, true));
             }
         }
     }
@@ -819,7 +819,7 @@ pub(super) fn sidebar(
 fn scoreboard(game: &crate::game::Game<'_>, batch: &mut HudBatch, panel: &HudPanel) -> Option<Rect> {
     use horizon_client::hud_layout::{GuiDraw, PoseOp};
     let (numbers, replacements) = {
-        let client = game.__horizon_mixins_vape_rs_client().clone();
+        let client = crate::game::vape_rs::core::client().clone();
         crate::game::vape_rs::core::with_client(&client, |runtime| {
             (runtime.scoreboard_numbers(), runtime.scoreboard_replacements())
         })

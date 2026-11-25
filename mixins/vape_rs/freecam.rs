@@ -27,7 +27,7 @@ pub(crate) fn tick(game: &mut Game<'_>) {
     if !host(game) {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (wanted, gui_open) = with_client(&client, |runtime| (runtime.freecam_wanted(), runtime.gui.open));
     // Freelook's post tick: the queued toggle and Hold's bind state.
     let (screen, player) = (game.screen != Screen::Playing || gui_open, game.player.is_some());
@@ -90,7 +90,7 @@ pub(crate) fn camera_entity(game: &Game<'_>) -> Option<horizon_client::camera::C
     if !host(game) {
         return None;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let camera = with_client(&client, |runtime| runtime.freecam_camera())?;
     let p = game.player.as_ref()?;
     let (eye, eye_old) = (f64::from(game.view.eye_height), f64::from(game.view.eye_height_old));
@@ -117,7 +117,7 @@ pub(crate) fn turn(game: &Game<'_>, xo: f64, yo: f64) -> bool {
     if !host(game) {
         return false;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     with_client(&client, |runtime| runtime.freecam_turn(xo, yo))
 }
 
@@ -126,7 +126,7 @@ pub(crate) fn body(game: &Game<'_>) -> bool {
     if !host(game) {
         return false;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     with_client(&client, |runtime| runtime.freecam_body())
 }
 
@@ -135,7 +135,7 @@ pub(crate) fn no_bob(game: &Game<'_>) -> bool {
     if !host(game) {
         return false;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     with_client(&client, |runtime| runtime.freecam_no_bob())
 }
 
@@ -145,7 +145,7 @@ pub(crate) fn requests(game: &Game<'_>) -> Vec<crate::game::vape_rs::core::movem
     if !host(game) {
         return Vec::new();
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     with_client(&client, |runtime| runtime.freecam_requests())
 }
 
@@ -178,7 +178,7 @@ fn camera_type(perspective: Perspective) -> CameraType {
 /// `gameSettings.I(savedPerspective)`: the perspective from before the
 /// freelook, put back once it ends.
 fn freelook_restore(game: &mut Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     if let Some(saved) = with_client(&client, |runtime| runtime.freelook_restore()) {
         game.camera_type = camera_type(saved);
     }
@@ -191,7 +191,7 @@ pub(crate) fn freelook_frame(game: &mut Game<'_>) -> Option<freelook::Camera> {
         return None;
     }
     freelook_restore(game);
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let gui_open = with_client(&client, |runtime| runtime.gui.open);
     let frame = freelook::Frame {
         view: (game.yaw, game.pitch),
@@ -225,6 +225,6 @@ pub(crate) fn freelook_turn(game: &Game<'_>, xo: f64, yo: f64) -> bool {
     // `turn_player` turns 0.15 degrees per unit: its units are counts times
     // `degrees_per_count / 0.15`.
     let scale = 0.15 / horizon_client::mouse::degrees_per_count(game.look_options());
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     with_client(&client, |runtime| runtime.freelook_turn(xo * scale, yo * scale))
 }

@@ -6,7 +6,7 @@ fn inventory_blur(game: &crate::game::Game<'_>) -> core::ops::ControlFlow<Option
     if !matches!(game.screen, crate::game::Screen::Inventory | crate::game::Screen::Creative) {
         return core::ops::ControlFlow::Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     if !with_client(&client, |runtime| runtime.enabled(ModuleId::InventoryBlur)) {
         return core::ops::ControlFlow::Continue(());
     }

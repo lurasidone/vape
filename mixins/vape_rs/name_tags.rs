@@ -42,7 +42,7 @@ fn entity_name(id: &str) -> String {
 }
 
 fn extras(game: &Game<'_>, alpha: f64, tags_on: bool, items_on: bool) -> Vec<Extra> {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let mut out = Vec::new();
     let Some(player) = game.player.as_ref() else {
         return out;
@@ -251,7 +251,7 @@ pub(crate) fn geometry(
     out: &mut Vec<Vertex>,
     see_through: &mut Vec<Vertex>,
 ) -> ControlFlow<()> {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (quads_on, (explosions_on, overlay_on)) = with_client(&client, |runtime| (runtime.world_quads_active(), runtime.depth_active()));
     if quads_on {
         world_quads(game, &client, camera, alpha, see_through);

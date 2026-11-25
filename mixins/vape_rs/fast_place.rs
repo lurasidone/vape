@@ -10,7 +10,7 @@ pub(super) fn fast_place(game: &mut crate::game::Game<'_>) {
     if game.serving.is_some() || game.options.dedicated.is_some() || game.player.is_none() {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let options = with_client(&client, |runtime| {
         if !runtime.enabled(ModuleId::FastPlace) || runtime.use_claimed() {
             return None;

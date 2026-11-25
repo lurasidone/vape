@@ -114,12 +114,6 @@ helper = "adapters/frame.rs"
 bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
 
 
-[[module]]
-id = "client-owner"
-file = "crates/horizon-client/src/game.rs"
-name = "vape_client_owner"
-source = "client_owner.rs"
-
 [[injection]]
 id = "session-world-open"
 target = "horizon_client::game::Game<'_>::open_world"
@@ -508,7 +502,7 @@ bindings = [{ name = "value", ty = "bool", value = "$value" }]
 
 [[module]]
 id = "smooth-text"
-file = "crates/horizon-client/src/ui_theme.rs"
+file = "crates/horizon-client/src/game.rs"
 name = "vape_smooth_text"
 source = "smooth_text.rs"
 

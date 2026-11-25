@@ -3,7 +3,7 @@ fn gui_events(
     id: winit::window::WindowId,
     event: &winit::event::WindowEvent,
 ) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     use crate::game::vape_rs::{core::with_client, input::KeyAction};
     use winit::event::{ElementState, Ime, MouseButton, MouseScrollDelta, WindowEvent};
     if game.serving.is_some()

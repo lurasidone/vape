@@ -3,7 +3,7 @@ fn gui_blur(game: &crate::game::Game<'_>) -> core::ops::ControlFlow<Option<f32>>
     if game.title.is_some() || game.player.is_none() {
         return core::ops::ControlFlow::Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     match with_client(&client, |runtime| runtime.gui_blur()) {
         None => core::ops::ControlFlow::Continue(()),
         Some(false) => core::ops::ControlFlow::Break(None),

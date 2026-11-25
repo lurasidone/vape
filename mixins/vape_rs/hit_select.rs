@@ -100,7 +100,7 @@ pub(crate) fn tick(game: &Game<'_>) {
     if !local(game) {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let view = view(game);
     with_client(&client, |rt| rt.hit_select_tick(&view));
 }
@@ -108,7 +108,7 @@ pub(crate) fn tick(game: &Game<'_>) {
 /// LeftClicker's `isHitSelectActive` with the crosshair entity still
 /// invulnerable and the player on the ground.
 pub(crate) fn defers(game: &Game<'_>) -> bool {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let view = view(game);
     view.on_ground
         && view.target.is_some_and(|t| t.hurt_time > 2)
@@ -121,7 +121,7 @@ pub(crate) fn attack(game: &mut Game<'_>) -> ControlFlow<bool> {
     if !local(game) {
         return Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let view = view(game);
     let click = with_client(&client, |rt| rt.hit_select_click(&view));
     if click.effects
@@ -138,6 +138,6 @@ pub(crate) fn hold_use(game: &Game<'_>) -> ControlFlow<()> {
     if !local(game) {
         return Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     if with_client(&client, |rt| rt.hit_select_cancel_use()) { Break(()) } else { Continue(()) }
 }

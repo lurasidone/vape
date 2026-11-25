@@ -32,7 +32,7 @@ pub fn attack(game: &mut Game<'_>, id: i32) -> bool {
     let Some(index) = game.mobs.iter().position(|m| m.alive() && m.id as i32 == id) else {
         return attack_guest(game, id);
     };
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let player = game.remote_player_names().iter().any(|(mob, _)| *mob as i32 == id);
     let hurt_time = game.mobs[index].hurt_time;
     let wtap = with_client(&client, |runtime| {
@@ -75,7 +75,7 @@ fn attack_guest(game: &mut Game<'_>, id: i32) -> bool {
     let Some(mut host) = game.lan.take() else {
         return false;
     };
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let wtap = with_client(&client, |runtime| {
         runtime.wtap_attack(true, 0);
         runtime.enabled(ModuleId::WTap)
@@ -121,7 +121,7 @@ pub fn keep_sprint(game: &mut Game<'_>, mob: usize) -> core::ops::ControlFlow<()
     if KEEP_SPRINT_INSIDE.with(Cell::get) || game.serving.is_some() || game.options.dedicated.is_some() {
         return ControlFlow::Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     if !with_client(&client, |runtime| runtime.enabled(ModuleId::KeepSprint)) {
         return ControlFlow::Continue(());
     }

@@ -24,7 +24,7 @@ fn observe_hook_data(
     let Some(target) = target else {
         return;
     };
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     crate::game::vape_rs::core::with_client(&client, |runtime| {
         runtime.observe_fish_hook(id, target);
     });

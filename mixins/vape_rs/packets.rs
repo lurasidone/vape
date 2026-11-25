@@ -144,7 +144,7 @@ pub fn inbound(game: &mut Game<'_>, packet: &C) -> core::ops::ControlFlow<super:
     if REPLAYING.with(Cell::get) {
         return Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let now = now_ms();
     // Repel's expected hit delay: damage packets are timed on arrival.
     match packet {
@@ -277,7 +277,7 @@ pub fn send(game: &Game<'_>, packet: &S) -> core::ops::ControlFlow<()> {
         return core::ops::ControlFlow::Continue(());
     }
     let Some(player) = game.player.as_ref() else { return core::ops::ControlFlow::Continue(()); };
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let ctx = Context {
         now_ms: now_ms(),
         in_gui: game.screen != Screen::Playing,
@@ -314,7 +314,7 @@ pub fn send(game: &Game<'_>, packet: &S) -> core::ops::ControlFlow<()> {
 
 /// Client tick: due and flushed packets go, and Regen sends its packets.
 pub fn tick(game: &mut Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (hold, flush) = with_client(&client, |runtime| {
         runtime.backtrack_tick();
         (runtime.inbound_hold_active(), runtime.take_inbound_flush())

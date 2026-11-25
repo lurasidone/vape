@@ -13,7 +13,7 @@ thread_local! {
 pub fn pre_motion(game: &mut Game<'_>) {
     GROUND.with(|g| g.set(None));
     let Some(player) = game.player.as_ref() else { return; };
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let dead = player.health.health() <= 0.0;
     let skip = dead || game.creative || player.flying;
     let (fall, motion_y, collision) = (player.fall_distance as f32, player.velocity.y, player.collision.horizontal);

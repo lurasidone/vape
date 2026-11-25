@@ -74,7 +74,7 @@ pub(crate) fn macro_rod_ready(game: &Game<'_>) -> bool {
             .iter()
             .any(|target| target.id == id),
         _ if game.remote.is_some() => {
-            let client = game.__horizon_mixins_vape_rs_client().clone();
+            let client = crate::game::vape_rs::core::client().clone();
             crate::game::vape_rs::core::with_client(&client, |runtime| {
                 runtime.fish_hook_target(hook.id).is_some_and(|target| {
                     game.mobs
@@ -129,7 +129,7 @@ pub(crate) fn auto_fish(game: &mut Game<'_>) {
         && !game.dialog_open()
         && game.server_packs.prompt.is_none()
         && !game.spectator();
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     // Take the host snapshot before locking the runtime. The runtime gate
     // waits, with a deadline, for the queued click's visible effect.
     let snapshot = crate::game::remote::vape_transactions::snapshot(game);

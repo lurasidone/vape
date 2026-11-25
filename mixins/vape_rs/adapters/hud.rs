@@ -1,5 +1,5 @@
 fn hud(game: &mut crate::game::Game<'_>, batch: &mut horizon_client::hud::HudBatch) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     use crate::game::vape_rs::core::with_client;
     if game.serving.is_some() || game.options.dedicated.is_some() {
         return;

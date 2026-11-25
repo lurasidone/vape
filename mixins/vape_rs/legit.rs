@@ -29,7 +29,7 @@ pub(crate) fn frame(game: &mut crate::game::Game<'_>) {
         CLOCK.with(|c| c.set(None));
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (time, weather) = with_client(&client, |runtime| (runtime.time_override(), runtime.weather_override()));
     let now = game.world.day_time;
     let last = CLOCK.with(|c| c.get());
@@ -73,7 +73,7 @@ pub(crate) fn frame(game: &mut crate::game::Game<'_>) {
 /// AntiDebuff (reference `onTick`): the chosen effects leave the client's
 /// effect list, and slowness its movement-speed modifier.
 pub(crate) fn anti_debuff(game: &mut crate::game::Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let removed = with_client(&client, |runtime| runtime.anti_debuff());
     for id in removed {
         if game.potions.effects.get(id).is_some() {

@@ -66,7 +66,7 @@ fn silent_use(game: &mut Game<'_>, rotation: (f32, f32)) {
         game.remote_use();
     } else if game.using.is_none() {
         if let Err(error) = game.use_with_hand() {
-            with_client(&game.__horizon_mixins_vape_rs_client(), |r| r.notify(format!("Pearl throw failed: {error}")));
+            with_client(&crate::game::vape_rs::core::client(), |r| r.notify(format!("Pearl throw failed: {error}")));
         }
         game.use_delay = 4;
     }
@@ -74,7 +74,7 @@ fn silent_use(game: &mut Game<'_>, rotation: (f32, f32)) {
 }
 
 pub fn tick(game: &mut Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     if !with_client(&client, |r| r.pearls_wanted()) {
         return;
     }
@@ -140,6 +140,6 @@ pub fn tick(game: &mut Game<'_>) {
 /// `onPlayerUseItem`: the local player used an ender pearl.
 pub fn used(game: &Game<'_>, item: &str) {
     if item == "minecraft:ender_pearl" {
-        with_client(&game.__horizon_mixins_vape_rs_client(), |r| r.pearl_used(Instant::now()));
+        with_client(&crate::game::vape_rs::core::client(), |r| r.pearl_used(Instant::now()));
     }
 }

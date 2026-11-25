@@ -1,5 +1,5 @@
 fn frame(game: &mut crate::game::Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     if game.serving.is_some() || game.options.dedicated.is_some() {
         return;
     }

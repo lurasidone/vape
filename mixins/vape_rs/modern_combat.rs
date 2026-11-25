@@ -160,7 +160,7 @@ fn begin(game: &mut Game<'_>) -> Option<(Epoch, u64)> {
     if off(game) {
         return None;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (wanted, pending, epoch, now) = with_client(&client, |runtime| {
         (runtime.modern_combat_wanted(), runtime.modern_combat_take_pending(), runtime.session().epoch(), runtime.now_ms())
     });
@@ -176,7 +176,7 @@ pub(super) fn tick(game: &mut Game<'_>) {
         ticks: game.hand_strength.ticker as f32,
         delay: horizon_client::attack_strength::delay(game.main_hand_attack_speed()),
     };
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let ops = with_client(&client, |runtime| runtime.modern_combat_tick(frame, cooldown));
     apply(game, &ops);
 }
@@ -186,7 +186,7 @@ pub(super) fn tick(game: &mut Game<'_>) {
 pub(super) fn press(game: &mut Game<'_>, cancelled: bool) -> bool {
     let Some((epoch, now)) = begin(game) else { return false };
     let frame = frame(game, epoch, now);
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (cancel, ops) = with_client(&client, |runtime| runtime.modern_combat_press(frame, cancelled));
     apply(game, &ops);
     cancel
@@ -196,7 +196,7 @@ pub(super) fn press(game: &mut Game<'_>, cancelled: bool) -> bool {
 pub(super) fn request(game: &mut Game<'_>, source: Source) -> bool {
     let Some((epoch, now)) = begin(game) else { return true };
     let frame = frame(game, epoch, now);
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (allowed, ops) = with_client(&client, |runtime| runtime.modern_combat_request(source, frame));
     apply(game, &ops);
     allowed
@@ -208,7 +208,7 @@ pub(super) fn trigger_assist(game: &Game<'_>, epoch: Epoch, now_ms: u64) -> (boo
         return (false, false);
     }
     let frame = frame(game, epoch, now_ms);
-    with_client(&game.__horizon_mixins_vape_rs_client().clone(), |runtime| runtime.modern_combat_trigger_assist(frame))
+    with_client(&crate::game::vape_rs::core::client().clone(), |runtime| runtime.modern_combat_trigger_assist(frame))
 }
 
 /// Attack HEAD, after Reach and WTap: `EventPostAttack` on the crosshair
@@ -217,7 +217,7 @@ pub(super) fn post_attack(game: &mut Game<'_>) {
     if off(game) || game.player.is_none() || game.spectator() {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (wanted, epoch, now) = with_client(&client, |runtime| (runtime.modern_combat_wanted(), runtime.session().epoch(), runtime.now_ms()));
     if !wanted {
         return;

@@ -99,7 +99,7 @@ pub(crate) fn tick(game: &mut Game<'_>) {
     if !local(game) {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let mode = with_client(&client, |rt| rt.block_hit_mode());
     let buffering = with_client(&client, |rt| rt.block_hit_buffering());
     let gone = game.player.is_none() || game.remote.is_none();
@@ -150,7 +150,7 @@ pub(crate) fn mouse(game: &mut Game<'_>, button: winit::event::MouseButton, pres
         }
         return Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let input = input(game);
     let mouse = with_client(&client, |rt| rt.block_hit_press(input, attack));
     if let Some(key) = mouse.key {
@@ -167,7 +167,7 @@ pub(crate) fn mouse(game: &mut Game<'_>, button: winit::event::MouseButton, pres
 /// `ClickerMod.shouldSimulateBlockHit` at AutoClicker's press: the use key
 /// goes down with the attack.
 pub(crate) fn clicker_press(game: &mut Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let input = input(game);
     if with_client(&client, |rt| rt.block_hit_simulate(input)) {
         apply(game, Key::Click);
@@ -184,7 +184,7 @@ pub(crate) fn clicker_release(game: &mut Game<'_>) {
 
 /// SilentAuraClicker's click: a simulated block held until the next tick.
 pub(crate) fn silent_click(game: &mut Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let input = input(game);
     if with_client(&client, |rt| rt.block_hit_simulate(input)) {
         apply(game, Key::Click);
@@ -204,7 +204,7 @@ pub(crate) fn inbound(game: &Game<'_>, packet: &C) {
         _ => false,
     };
     if hit {
-        let client = game.__horizon_mixins_vape_rs_client().clone();
+        let client = crate::game::vape_rs::core::client().clone();
         with_client(&client, |rt| rt.block_hit_damaged());
     }
 }
@@ -215,7 +215,7 @@ pub(crate) fn send(game: &Game<'_>, packet: &S) -> ControlFlow<()> {
     if game.remote.is_none() || game.player.is_none() || !local(game) {
         return Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let release_use = matches!(packet, S::PlayerAction(a) if a.action == 6);
     let Some((lag, buffering)) =
         try_with_client(&client, |rt| (rt.block_hit_mode() == Some(Mode::Lag), rt.block_hit_buffering()))

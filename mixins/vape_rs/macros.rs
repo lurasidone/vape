@@ -36,7 +36,7 @@ fn plain(text: &str) -> String {
 }
 // `advance` is the client tick (the reference's pre-tick); frames only clean up.
 pub fn frame(game: &mut Game<'_>, advance: bool) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let context = context(game);
     let allowed = context.accepts_input;
     let effects = with_client(&client, |r| r.macro_frame(context, advance));
@@ -63,7 +63,7 @@ pub fn use_once(game: &mut Game<'_>) {
         remote.input.press(horizon_client::interaction_input::Button::Use);
     } else if game.using.is_none() {
         if let Err(error) = game.use_with_hand() {
-            with_client(&game.__horizon_mixins_vape_rs_client(), |r| r.notify(format!("Automatic item use failed: {error}")));
+            with_client(&crate::game::vape_rs::core::client(), |r| r.notify(format!("Automatic item use failed: {error}")));
         }
         game.use_delay = 4;
     }

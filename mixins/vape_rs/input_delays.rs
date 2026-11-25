@@ -19,7 +19,7 @@ pub(crate) fn input_delays(game: &mut crate::game::Game<'_>) {
     {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (no_jump_delay, no_click_delay) = with_client(&client, |runtime| {
         (
             runtime.enabled(ModuleId::NoJumpDelay),
@@ -95,7 +95,7 @@ pub(crate) fn host_view(game: &crate::game::Game<'_>) -> HostView {
 }
 
 fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: bool) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     // A socket key's release is seen at its release event (adapters/input.rs).
     let view = host_view(game);
     let active = requests && playing(game);

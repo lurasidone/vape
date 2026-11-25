@@ -237,7 +237,7 @@ fn frame(game: &Game<'_>, batch: &HudBatch, epoch: crate::game::vape_rs::core::l
     let pose = game.bob_matrix(partial) * game.spinning_matrix(partial);
     let matrix = glam::Mat4::perspective_rh(fov.to_radians(), aspect, 0.05, 1024.0) * pose * view;
     let projection = Projection { camera, matrix: matrix.to_cols_array(), width: batch.width, height: batch.height };
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (spawners_wanted, beds_wanted, entities_wanted, indicators_wanted) =
         with_client(&client, |r| (r.spawners_wanted(), r.bed_plates_wanted(), r.overlay_entities_wanted(), r.indicators_wanted()));
     // Only the modules that read entities pay for the snapshot and its
@@ -276,7 +276,7 @@ pub(crate) fn draw(game: &mut Game<'_>, batch: &mut HudBatch) {
     if game.title.is_some() || game.serving.is_some() || game.options.dedicated.is_some() {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let Some(epoch) = with_client(&client, |runtime| runtime.overlay_active().then(|| runtime.session().epoch())) else {
         return;
     };

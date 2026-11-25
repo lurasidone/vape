@@ -1,5 +1,5 @@
 fn gui_render(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud::HudBatch) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     use crate::game::vape_rs::{
         core::with_client,
         ui::gui::{Align, HudRegion, Paint, Rect},
@@ -115,8 +115,8 @@ fn gui_render(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud::Hud
                 let (size, line) = (TEXT_EM * scale, 8.0 * scale);
                 let mut ui = horizon_client::ui_theme::Ui::new(atlas, batch, (0.0, 0.0));
                 let prefix = |n| text.chars().take(n).collect::<String>();
-                let cursor_x = ui.vape_rs_measure(&prefix(caret), size);
-                let anchor_x = ui.vape_rs_measure(&prefix(anchor), size);
+                let cursor_x = crate::game::vape_smooth_text::measure(&ui, &prefix(caret), size);
+                let anchor_x = crate::game::vape_smooth_text::measure(&ui, &prefix(anchor), size);
                 let scroll = (cursor_x - (w - 9.0 * fs).max(0.0)).max(0.0);
                 let left = x + 4.0 * fs - scroll;
                 let top = y + (h - line) / 2.0;
@@ -130,7 +130,7 @@ fn gui_render(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud::Hud
                         0xff6b5641,
                     );
                 }
-                ui.vape_rs_text(&text, left, top, size, line, color);
+                crate::game::vape_smooth_text::text(&mut ui, &text, left, top, size, line, color);
                 ui.batch.fill(atlas, left + cursor_x, top, 0.5 * fs, line, color);
                 ui.finish();
             }
@@ -148,14 +148,14 @@ fn gui_render(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud::Hud
                 let scale = scale * fs;
                 let size = TEXT_EM * scale;
                 let mut ui = horizon_client::ui_theme::Ui::new(atlas, batch, (0.0, 0.0));
-                let width = ui.vape_rs_measure(&text, size);
+                let width = crate::game::vape_smooth_text::measure(&ui, &text, size);
                 let x = ox + x * fs
                     - match align {
                         Align::Left => 0.0,
                         Align::Center => width / 2.0,
                         Align::Right => width,
                     };
-                ui.vape_rs_text(&text, x, oy + y * fs, size, 8.0 * scale, color);
+                crate::game::vape_smooth_text::text(&mut ui, &text, x, oy + y * fs, size, 8.0 * scale, color);
                 ui.finish();
             }
         }

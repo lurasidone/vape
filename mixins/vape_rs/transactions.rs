@@ -302,7 +302,7 @@ pub fn snapshot(game: &Game<'_>) -> Option<Snapshot> {
     if game.player.is_none() {
         return None;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let session = with_client(&client, |runtime| runtime.session().epoch().value());
     let mut slots = Vec::with_capacity(64);
     for (index, value) in game.inventory.iter().enumerate() {
@@ -489,7 +489,7 @@ pub fn input_held(game: &Game<'_>) -> bool {
     if game.serving.is_some() || game.options.dedicated.is_some() {
         return false;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     with_client(&client, |r| r.auto_totem_input_held())
 }
 
@@ -497,7 +497,7 @@ pub fn input_held(game: &Game<'_>) -> bool {
 // world simulation is paused. Scheduling uses monotonic time in the runtime.
 pub fn dispatch(game: &mut Game<'_>) {
     use crate::game::vape_rs::core::inventory_runtime::InventoryEffect;
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let allowed = matches!(game.screen, Screen::Playing | Screen::Inventory)
         && game.focused
         && game.title.is_none()
@@ -648,7 +648,7 @@ fn motion_allowed(game: &Game<'_>) -> bool {
 /// ignore it); an armed potion makes this motion packet look down through
 /// the managed rotation, keeping its yaw.
 pub fn auto_heal_pre_motion(game: &mut Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     if !motion_allowed(game) || !with_client(&client, |r| r.auto_heal_potions()) {
         return;
     }
@@ -678,7 +678,7 @@ pub fn auto_heal_post_motion(game: &mut Game<'_>) {
     if let Some((_, previous)) = look {
         super::vape_combat_remote::set_rotation(previous);
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     if !motion_allowed(game) {
         return;
     }

@@ -29,7 +29,7 @@ fn previous(game: &Game<'_>) -> Vec<(i32, [f64; 3])> {
 }
 
 pub(super) fn tick(game: &mut Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (kill, silent, epoch, now, walls) = with_client(&client, |runtime| {
         let walls = |id: &str| runtime.settings().get(&format!("{id}.targets.ignore-walls")).and_then(serde_json::Value::as_bool).unwrap_or(false);
         (

@@ -6,7 +6,7 @@ fn gui_no_pause(game: &crate::game::Game<'_>) -> core::ops::ControlFlow<bool> {
     if game.screen != crate::game::Screen::Paused || game.pause_menu {
         return core::ops::ControlFlow::Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     match try_with_client(&client, |runtime| runtime.ui_screen_owned) {
         Some(true) => core::ops::ControlFlow::Break(false),
         _ => core::ops::ControlFlow::Continue(()),

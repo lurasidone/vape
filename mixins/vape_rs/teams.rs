@@ -46,7 +46,7 @@ pub(crate) fn snapshot(game: &Game<'_>) -> Snapshot {
 
 /// Pushes this tick's snapshot before targeting runs (`EventPreTick`).
 pub(crate) fn tick(game: &Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let active = crate::game::vape_rs::core::with_client(&client, |rt| rt.target_filter_active());
     let snapshot = if active { snapshot(game) } else { Snapshot::default() };
     crate::game::vape_rs::core::with_client(&client, |rt| rt.target_filter_tick(snapshot));

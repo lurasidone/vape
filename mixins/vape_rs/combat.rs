@@ -175,7 +175,7 @@ pub(super) fn aim_assist(game: &mut Game<'_>) {
     if game.serving.is_some() || game.options.dedicated.is_some() {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (active, epoch, walls, range) = with_client(&client, |runtime| {
         let walls = runtime.settings().get("combat.aim-assist.targets.ignore-walls").and_then(serde_json::Value::as_bool).unwrap_or(false);
         let range = runtime.settings().get("combat.aim-assist.distance").and_then(serde_json::Value::as_f64).unwrap_or(8.0);
@@ -277,7 +277,7 @@ pub(super) fn trigger_tick(game: &Game<'_>, now_ms: u64, epoch: crate::game::vap
 
 /// Client tick HEAD: one TriggerBot step and its synthetic attack click.
 pub(super) fn trigger_bot(game: &mut Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (active, epoch, now, walls) = with_client(&client, |runtime| {
         let walls = runtime.settings().get("combat.trigger-bot.targets.ignore-walls").and_then(serde_json::Value::as_bool).unwrap_or(false);
         (runtime.trigger_bot_active(), runtime.session().epoch(), runtime.now_ms(), walls)
@@ -299,7 +299,7 @@ pub(super) fn trigger_bot(game: &mut Game<'_>) {
 
 /// The physical attack button changed. True swallows the activation click.
 pub(super) fn trigger_bot_input(game: &Game<'_>, pressed: bool) -> bool {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (enabled, epoch, now) = with_client(&client, |runtime| {
         (runtime.enabled(ModuleId::TriggerBot), runtime.session().epoch(), runtime.now_ms())
     });
@@ -340,7 +340,7 @@ pub(crate) fn facing(game: &Game<'_>, friends: &[String]) -> crate::game::vape_r
 /// the replacement lands right after the host's own assignment: at the next
 /// packet or tick, and only if the motion is still exactly what the packet set.
 fn apply_motion_override(game: &mut Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let Some((replacement, received)) = with_client(&client, |runtime| runtime.take_motion_override()) else { return; };
     if let Some(player) = game.player.as_mut()
         && [player.velocity.x, player.velocity.y, player.velocity.z] == received
@@ -357,7 +357,7 @@ pub(super) fn inbound(game: &mut Game<'_>, packet: &horizon_protocol::packets::p
     apply_motion_override(game);
     if let C::PlayerPosition(_) = packet {
         // AntiFall's onPacketReceive (S08): the lagback landed.
-        let client = game.__horizon_mixins_vape_rs_client().clone();
+        let client = crate::game::vape_rs::core::client().clone();
         if with_client(&client, |runtime| {
             runtime.server_teleport();
             runtime.enabled(ModuleId::AntiFall)
@@ -373,7 +373,7 @@ pub(super) fn inbound(game: &mut Game<'_>, packet: &horizon_protocol::packets::p
     if !game.remote.as_ref().is_some_and(|r| r.entity_id == p.id) {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     with_client(&client, |runtime| runtime.no_slowdown_knockback());
     let (active, friends) = with_client(&client, |runtime| (runtime.velocity_active(), runtime.friend_keys()));
     if !active || game.player.is_none() {
@@ -394,7 +394,7 @@ pub(super) fn explosion(game: &mut Game<'_>, p: &horizon_protocol::packets::play
     use crate::game::vape_rs::modules::combat::velocity::Decision;
     use core::ops::ControlFlow;
     let Some(push) = p.knockback else { return ControlFlow::Continue(()); };
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (active, reentry, friends) = with_client(&client, |runtime| {
         if !runtime.explosion_reentry_pending() {
             runtime.no_slowdown_knockback();
@@ -418,7 +418,7 @@ pub(super) fn explosion(game: &mut Game<'_>, p: &horizon_protocol::packets::play
 /// Client tick HEAD: Velocity's delayed scaling of the current motion.
 pub(super) fn velocity_tick(game: &mut Game<'_>) {
     apply_motion_override(game);
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let Some(player) = game.player.as_ref() else { return; };
     let water = player.fluids.was_touching_water;
     let v = [player.velocity.x, player.velocity.y, player.velocity.z];
@@ -466,7 +466,7 @@ pub(super) fn pick(game: &Game<'_>) -> core::ops::ControlFlow<Option<(usize, f64
     if game.serving.is_some() || game.options.dedicated.is_some() || game.creative {
         return ControlFlow::Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let player = reach_player(game);
     match crate::game::vape_rs::core::try_with_client(&client, |runtime| runtime.pick_range(player)).flatten() {
         Some((reach, expand)) => ControlFlow::Break(mob_hit_with(game, reach, expand)),
@@ -476,7 +476,7 @@ pub(super) fn pick(game: &Game<'_>) -> core::ops::ControlFlow<Option<(usize, f64
 
 /// Client tick HEAD: Reach's Advanced-mode target trace at the maximum range.
 pub(super) fn reach_tick(game: &Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let max = with_client(&client, |runtime| {
         runtime.enabled(ModuleId::Reach).then(|| {
             crate::game::vape_rs::modules::combat::reach::Options::read(runtime.settings()).range.1
@@ -489,7 +489,7 @@ pub(super) fn reach_tick(game: &Game<'_>) {
 
 /// An attack started (`EventPostAttack`).
 pub(super) fn post_attack(game: &mut Game<'_>) {
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     with_client(&client, |runtime| runtime.reach_post_attack());
     // WTap's EventPreAttack: the crosshair mob this attack will hit.
     let names = game.remote_player_names();
@@ -515,7 +515,7 @@ pub(super) fn clickers(game: &mut Game<'_>) {
     if game.serving.is_some() || game.options.dedicated.is_some() {
         return;
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let (now, left_on, right_on) = with_client(&client, |runtime| {
         (runtime.now_ms(), runtime.enabled(ModuleId::AutoClicker), runtime.enabled(ModuleId::RightClicker))
     });
@@ -572,7 +572,7 @@ pub(super) fn clickers(game: &mut Game<'_>) {
 pub(super) fn movement_tick(game: &mut Game<'_>) {
     use crate::game::vape_rs::modules::blatant::{anti_fall, fly, no_slowdown, speed};
     use winit::keyboard::KeyCode;
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     with_client(&client, |runtime| runtime.clicker_tick());
     if game.player.is_none() {
         return;

@@ -6,7 +6,7 @@ fn no_hurt_camera(
     if game.serving.is_some() || game.options.dedicated.is_some() {
         return core::ops::ControlFlow::Continue(());
     }
-    let client = game.__horizon_mixins_vape_rs_client().clone();
+    let client = crate::game::vape_rs::core::client().clone();
     let no_hurt = with_client(&client, |runtime| runtime.enabled(ModuleId::NoHurtCamera));
     // Freecam's `suppressViewBobbing`: the view bob is off for the frame.
     let no_bob = crate::game::vape_freecam::no_bob(game);
