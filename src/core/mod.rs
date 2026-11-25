@@ -9,6 +9,8 @@ pub mod inventory_extra;
 pub mod inventory_fill;
 pub mod inventory_runtime;
 pub mod lifecycle;
+mod thread_client;
+pub use thread_client::client;
 pub mod macro_runtime;
 pub mod modern_combat_runtime;
 pub mod movement_input;

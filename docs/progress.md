@@ -2503,3 +2503,29 @@ No host scenarios were run for the merged worker edits, so none of their
 ledger rows changed. The new scenario tools (aura_lan, targeting_modes,
 fast_place, invutil_r6) are unrun. Their claims need a scenario pass in a later
 round before any row moves to validated.
+
+## 2026-11-25: runtime initialization on the current nightly SDK
+
+Refactored the per-thread client handle into `src/core/thread_client.rs` and
+exposed it as `core::client()`. The pinned-era `client_owner` mixin keeps its
+`Game` accessor but now delegates to that shared handle. This also works with
+the current SDK, whose patch mirror refuses inherent impls on Horizon's
+external `Game` type.
+
+Using the user-provided official `f1bb66f353cf67f2aa4665293fc75c8d91186fc7`
+source and signed SDK, `cargo xtask pack` generated the complete runtime
+payload. Horizon launcher `0.2.108` built and installed that payload plus a
+client-tick hook as `native-f1bb66f-401234c31414` in the isolated launcher
+home at `target/scenarios/sdk-validation-current/launcher`. The real client
+smoke then ran from a fresh home with a local generated world: **1,585 frames,
+117 chunks, 2,221 meshed sections, a player, no error**. Its log confirms
+`[vape-rs] client runtime ready` and both profile/world session transitions.
+Smoke evidence is under ignored `target/scenarios/sdk-nightly-vape-final/`;
+Minecraft resources were read-only from the installed nightly and no account,
+world or credentials were used.
+
+This proves the full Rust runtime payload can be compiled into a current-nightly
+native mod and its first client-tick integration executes in a rendered game.
+It does not port the existing gameplay hooks, HUD/UI or feature set to this
+SDK: the current probe manifest and adapter remain disposable `target/`
+artifacts. Keep all feature rows and overall completion status unchanged.
