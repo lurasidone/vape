@@ -2652,6 +2652,9 @@ its health went **20.0 -> 12.5**; with NoFall on at the same height its health
 stayed **20.0**. Both guests landed at `y=101` with `on_ground=true` and quit
 cleanly. The earlier integrated-world NoFall run could not exercise this
 path: `Game::send` only forwards packets when `remote` is set, so a
-single-player server never sees a spoofed position packet. This validates
-NoFall's Normal claim on the remote path; AntiCheat mode and the other
-gameplay features still need their own host scenarios.
+single-player server never sees a spoofed position packet. Repeated the same
+LAN fall with AntiCheat mode in `target/scenarios/sdk-nofall-ac-z02y28lq/`:
+the control again lost **7.5** health (20.0 -> 12.5), while AntiCheat at the
+same height kept **20.0**; both landed at `y=101` and quit cleanly. This
+validates both NoFall modes on the remote path; the other gameplay features
+still need their own host scenarios.
