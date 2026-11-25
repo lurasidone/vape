@@ -60,7 +60,7 @@ pub fn pre_motion(game: &mut Game<'_>) {
     GROUND.with(|g| g.set(ground));
 }
 
-/// The position sender's on-ground argument.
-pub fn on_ground(value: bool) -> bool {
-    GROUND.with(|g| g.take()).unwrap_or(value)
+/// The claimed on-ground value for the next movement packet, if any.
+pub fn take_ground() -> Option<bool> {
+    GROUND.with(|g| g.take())
 }

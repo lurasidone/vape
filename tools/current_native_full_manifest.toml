@@ -454,6 +454,28 @@ file = "crates/horizon-client/src/game/network/remote/mod.rs"
 name = "vape_movement"
 source = "src/movement.rs"
 
+[[native.mixin]]
+id = "send-state"
+target = "horizon_client::game::remote::Game::remote_send_state"
+kind = "HEAD"
+helper = "src/adapters/send_state.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+# NoFall's claimed landing, applied to this tick's movement packet only. The
+# parameter load is the packet handed to the session, after the send hooks.
+[[native.mixin]]
+id = "send-state-ground"
+target = "horizon_client::game::remote::Game<'_>::send"
+kind = "MODIFY_ARG"
+selector = "self.send_body"
+require = 1
+ordinal = 0
+argument = 0
+helper = "src/adapters/send_state_ground.rs"
+bindings = [
+ { name = "value", ty = "S", value = "$value" },
+]
+
 
 
 [[native.module]]

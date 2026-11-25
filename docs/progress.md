@@ -2626,3 +2626,32 @@ client ticks, loaded the mod, and quit cleanly. The measured rate doubled as
 configured. This validates Timer's current-SDK tick scaling, including the
 final fractional-carry reset build; other gameplay features still need their
 own host scenarios. No feature-ledger row changed.
+
+## 2026-11-25: NoFall packet claim on the current SDK
+
+The full candidate had no NoFall motion hook, so the module could not change
+the on-ground flag of the player's position packet. Added two current-SDK
+mixins to `tools/current_native_full_manifest.toml`: a `HEAD` on
+`horizon_client::game::remote::Game<'_>::remote_send_state` that computes the
+claim through `vape_movement::pre_motion`, and a `MODIFY_ARG` on the
+`self.send_body` call inside `Game<'_>::send` (argument 0) that rewrites only
+this packet's on-ground bit from the shared thread-local. The position sender
+lives in the library crate on this SDK, so the claim is applied at the game
+crate's send boundary; the earlier attempt to modify the
+`PositionSender::update` parameter was refused by the tool (non-scalar `LOAD`),
+and `remote_send_state_body` is not copyable because its body uses an
+ambiguous `matches!` macro.
+
+Built through the signed Nov 22 SDK and launcher `0.2.108`; the launcher
+reported `Your mods are built` and selected
+`native-f1bb66f-de8e93a51eb8`. Validated NoFall Normal in a fresh isolated
+LAN host/guest scenario at
+`target/scenarios/sdk-nofall-lan-vzg8196e/`: the host opened a survival world
+to LAN, the guest fell 13 blocks onto a stone platform, and with NoFall off
+its health went **20.0 -> 12.5**; with NoFall on at the same height its health
+stayed **20.0**. Both guests landed at `y=101` with `on_ground=true` and quit
+cleanly. The earlier integrated-world NoFall run could not exercise this
+path: `Game::send` only forwards packets when `remote` is set, so a
+single-player server never sees a spoofed position packet. This validates
+NoFall's Normal claim on the remote path; AntiCheat mode and the other
+gameplay features still need their own host scenarios.
