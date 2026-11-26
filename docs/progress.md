@@ -2974,3 +2974,12 @@ outgoing yaw/pitch, and the host drives `Claimant::BedBreaker`'s silent
 rotation at the Hypixel cover centre when the module's `server_rotation` is
 set (released otherwise). `cargo check --offline` and the native build
 (`native-f1bb66f-5200d043cad6`) pass. The movement-key remap remains.
+
+## 2026-11-26: BedBreaker movement remap
+
+While the Hypixel server rotation is active, `resolve_movement` presses the
+rotated axes (forward/back/left/right by the relative yaw, the reference's
+0.4 threshold) with its own movement owner, so the same view that goes into
+the packet drives the movement. `cargo check --offline` and the native
+build (`native-f1bb66f-78e09a0ae5d1`) pass. BedBreaker's host is complete;
+its host scenario remains.

@@ -81,7 +81,8 @@ some hook points moved. Current full build: `native-f1bb66f-76d3241d8036`.
   target within 4.5 blocks and the entity pick is suppressed; the overlay
   draws a per-target box, highlights the chosen one and shows the Hypixel
   cover's tool. The Hypixel server rotation is driven through the silent
-  rotation; the movement-key remap remains.
+  rotation and the movement-key remap is in. BedBreaker's host is complete;
+  its host scenario remains.
 - **Not started modules** (CrystalAura, AutoAnchor, Block-In, the
   InventoryManager filter-rule editor, translations/fonts) can resume: the
   exact reference `3d600a48` / `4.21.43` is cloned at the sibling

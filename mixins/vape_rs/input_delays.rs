@@ -98,6 +98,17 @@ pub(crate) fn host_view(game: &crate::game::Game<'_>) -> HostView {
     }
 }
 
+/// The yaw/pitch from an eye to a block centre, in the game's convention.
+fn bed_angles(eye: [f64; 3], target: [f64; 3]) -> (f32, f32) {
+    let dx = target[0] - eye[0];
+    let dy = target[1] - eye[1];
+    let dz = target[2] - eye[2];
+    (
+        (-dx).atan2(dz).to_degrees() as f32,
+        (-dy).atan2((dx * dx + dz * dz).sqrt()).to_degrees() as f32,
+    )
+}
+
 fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: bool) {
     let client = crate::game::vape_rs::core::client().clone();
     // A socket key's release is seen at its release event (adapters/input.rs).
@@ -138,6 +149,41 @@ fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: boo
         )
     });
     let mut overrides = Overrides::default();
+    // BedBreaker's Hypixel server rotation: press the keys the rotated view
+    // needs, as the reference's onPreLocalPlayerTick does.
+    if let Some(block) = with_client(&client, |runtime| runtime.bed_breaker_server_rotation())
+        && let Some(player) = game.player.as_ref()
+    {
+        let eye = [
+            player.position.x,
+            player.position.y + f64::from(player.dimensions.eye_height),
+            player.position.z,
+        ];
+        let target = [
+            f64::from(block[0]) + 0.5,
+            f64::from(block[1]) + 0.5,
+            f64::from(block[2]) + 0.5,
+        ];
+        let (yaw, _) = bed_angles(eye, target);
+        let radians = (yaw - game.yaw).rem_euclid(360.0).to_radians();
+        let forward = radians.cos();
+        let left = -radians.sin();
+        for (axis, press) in [
+            (Axis::Forward, forward >= 0.4),
+            (Axis::Back, forward <= -0.4),
+            (Axis::Left, left >= 0.4),
+            (Axis::Right, left <= -0.4),
+        ] {
+            if press {
+                overrides.request(Request {
+                    axis,
+                    owner: Owner::BedBreaker,
+                    priority: 3,
+                    pressed: true,
+                });
+            }
+        }
+    }
     if sprint {
         overrides.request(Request {
             axis: Axis::Sprint,

@@ -57,6 +57,8 @@ pub enum Owner {
     Freecam,
     /// The movement-task key bindings (`MovementInputHelper.setKeyPressed`).
     KeyHelper,
+    /// BedBreaker's Hypixel server rotation remap.
+    BedBreaker,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
