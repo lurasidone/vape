@@ -320,6 +320,45 @@ pub fn status_priority(status: Option<&str>) -> u8 {
     }
 }
 
+/// The reference's target-mode comparators (`targetMode`).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum TargetMode {
+    Yaw,
+    Distance,
+    Armor,
+    Health,
+}
+
+/// A candidate's sort keys, filled from the entity the reference sorts.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TargetScore {
+    pub angle: f64,
+    pub distance: f64,
+    pub armor: f64,
+    pub health: f64,
+}
+
+impl TargetScore {
+    /// The reference's comparator key: ascending for every mode.
+    pub fn key(self, mode: TargetMode) -> f64 {
+        match mode {
+            TargetMode::Yaw => self.angle,
+            TargetMode::Distance => self.distance,
+            TargetMode::Armor => self.armor,
+            TargetMode::Health => self.health,
+        }
+    }
+}
+
+/// Sort the candidates the way the reference's target mode does.
+pub fn sort_targets(scores: &mut [TargetScore], mode: TargetMode) {
+    scores.sort_by(|a, b| {
+        a.key(mode)
+            .partial_cmp(&b.key(mode))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -407,5 +446,31 @@ mod tests {
         assert!(is_alive(20.0, false));
         assert!(in_range(4.0, 4.0));
         assert!(!in_range(4.5, 4.0));
+    }
+
+    #[test]
+    fn distance_mode_sorts_nearest_first() {
+        let mut scores = [
+            TargetScore {
+                angle: 10.0,
+                distance: 5.0,
+                armor: 2.0,
+                health: 20.0,
+            },
+            TargetScore {
+                angle: 1.0,
+                distance: 2.0,
+                armor: 9.0,
+                health: 8.0,
+            },
+        ];
+        sort_targets(&mut scores, TargetMode::Distance);
+        assert_eq!(scores[0].distance, 2.0);
+        sort_targets(&mut scores, TargetMode::Yaw);
+        assert_eq!(scores[0].angle, 1.0);
+        sort_targets(&mut scores, TargetMode::Armor);
+        assert_eq!(scores[0].armor, 2.0);
+        sort_targets(&mut scores, TargetMode::Health);
+        assert_eq!(scores[0].health, 8.0);
     }
 }
