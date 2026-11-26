@@ -2,6 +2,7 @@ pub mod anti_fireball_runtime;
 pub mod auto_anchor_runtime;
 pub mod automation;
 pub mod bed_breaker_runtime;
+pub mod block_in_runtime;
 pub mod combat_extra;
 pub mod combat_runtime;
 pub mod crystal_aura_runtime;
@@ -137,6 +138,7 @@ pub struct Runtime {
     bed_breaker: bed_breaker_runtime::BedBreaker,
     crystal_aura: super::modules::combat::crystal_aura::Target,
     auto_anchor: super::modules::utility::auto_anchor::Macro,
+    block_in: super::modules::world::block_in::Macro,
     speed: super::modules::blatant::speed::State,
     long_jump: super::modules::blatant::long_jump::State,
     anti_fall: super::modules::blatant::anti_fall::State,
@@ -392,6 +394,7 @@ impl Default for Runtime {
             .chain(super::modules::world::bed_breaker::definitions())
             .chain(super::modules::combat::crystal_aura::definitions())
             .chain(super::modules::utility::auto_anchor::definitions())
+            .chain(super::modules::world::block_in::definitions())
             .chain(super::modules::movement::definitions())
         {
             settings.define(definition).unwrap();
@@ -578,6 +581,7 @@ impl Default for Runtime {
             bed_breaker: Default::default(),
             crystal_aura: Default::default(),
             auto_anchor: Default::default(),
+            block_in: Default::default(),
             speed: Default::default(),
             long_jump: Default::default(),
             anti_fall: Default::default(),
@@ -689,6 +693,10 @@ impl Runtime {
     pub fn auto_anchor(&mut self) -> &mut super::modules::utility::auto_anchor::Macro {
         &mut self.auto_anchor
     }
+    /// The Block-In placement ledger.
+    pub fn block_in(&mut self) -> &mut super::modules::world::block_in::Macro {
+        &mut self.block_in
+    }
     /// The host view and target angles of the bed rotation.
     pub fn bed_breaker_rotation(&self) -> Option<((f32, f32), (f32, f32))> {
         self.bed_breaker.rotation()
@@ -741,6 +749,9 @@ impl Runtime {
             self.auto_anchor
                 .start(options.mode, self.now_ms(), options.delay);
         }
+        if module == ModuleId::BlockIn && enabled {
+            self.block_in.reset();
+        }
         self.movement_toggled(module, enabled);
         self.pearls_toggled(module, enabled);
         self.freecam_toggled(module, enabled);
@@ -784,6 +795,11 @@ impl Runtime {
                     self.auto_anchor.reset();
                     rotation_runtime::Shared::of(&mut self.combat, &mut self.rotations)
                         .release(Claimant::AutoAnchor);
+                }
+                ModuleId::BlockIn => {
+                    self.block_in.reset();
+                    rotation_runtime::Shared::of(&mut self.combat, &mut self.rotations)
+                        .release(Claimant::BlockIn);
                 }
                 ModuleId::Speed => self.speed.reset(),
                 ModuleId::LongJump => self.long_jump.reset(),
@@ -2493,6 +2509,7 @@ impl Runtime {
                 ModuleId::NoHurtCamera
                 | ModuleId::CrystalAura
                 | ModuleId::AutoAnchor
+                | ModuleId::BlockIn
                 | ModuleId::AutoTool
                 | ModuleId::AutoArmor
                 | ModuleId::AutoTotem

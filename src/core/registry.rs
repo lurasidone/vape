@@ -65,6 +65,7 @@ registry! {
     BedBreaker => "world.bed-breaker", "BedBreaker", "World", None, [];
     CrystalAura => "combat.crystal-aura", "CrystalAura", "Combat", None, [];
     AutoAnchor => "utility.auto-anchor", "AutoAnchor", "Utility", None, [];
+    BlockIn => "world.block-in", "Block-In", "World", None, [];
     Fullbright => "render.fullbright", "Fullbright", "Render", None, [];
     ClearWater => "render.clear-water", "Clear Water", "Render", None, [];
     AutoFish => "utility.auto-fish", "AutoFish", "World", None, [];

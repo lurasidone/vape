@@ -3119,3 +3119,23 @@ SDK build (`native-f1bb66f-692e58ab05e8`) compiles; the new
 `tools/auto_anchor_scenario.py` passes **8/8** in a fresh isolated world:
 the module starts disabled, enables through its bind, places the anchor,
 charges it, detonates it and disables, and the player survives.
+
+## 2026-11-26: Block-In
+
+`world.block-in` ports the reference's enclosure placement: the host picks
+the best hotbar block (the reference priority list or hardness, with the
+block blacklist), finds the four cardinal cells around the player's feet
+block and the four above, keeps the cells whose support face is visible
+through a raycast, orders them toward a nearby bed, and the module aims at
+the support face with the shared rotation (silent managed or visible fixed
+under `Claimant::BlockIn`, priority 9), holds the sneak key and clicks on
+the reference's random Place delay. A completed enclosure (no missing
+cells) releases the rotation, restores the previous hotbar slot and
+disables.
+
+`cargo test --offline --lib` passes 503 tests (5 block_in); the native SDK
+build (`native-f1bb66f-6fc49a990480`) compiles; the new
+`tools/block_in_scenario.py` passes **7/7** in a fresh isolated world: the
+eight walls around the player are stone and the module disables. The
+reference's full placement-path search and the enclosure movement task
+remain.

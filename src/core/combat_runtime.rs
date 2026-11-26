@@ -85,6 +85,9 @@ impl Runtime {
         if id.starts_with("utility.auto-anchor.") {
             self.auto_anchor.reset();
         }
+        if id.starts_with("world.block-in.") {
+            self.block_in.reset();
+        }
         let c = &mut self.combat;
         if id.starts_with("combat.kill-aura.") {
             c.kill_aura.reset();
@@ -104,6 +107,7 @@ impl Runtime {
     pub(super) fn combat_session_reset(&mut self) {
         self.crystal_aura.reset();
         self.auto_anchor.reset();
+        self.block_in.reset();
         let c = &mut self.combat;
         c.kill_aura.reset();
         c.keep_sprint.reset();

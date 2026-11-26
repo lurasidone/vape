@@ -13,6 +13,7 @@ use crate::game::vape_rs::modules::movement::{inv_walk, scaffold, wind_charge};
 use crate::game::vape_rs::modules::combat::crystal_aura;
 use crate::game::vape_rs::modules::combat::rotation;
 use crate::game::vape_rs::modules::utility::auto_anchor;
+use crate::game::vape_rs::modules::world::block_in;
 use horizon_core::geometry::Vec3;
 use winit::keyboard::KeyCode;
 
@@ -25,6 +26,8 @@ thread_local! {
     static BED_SCAN_TICKS: core::cell::Cell<u64> = const { core::cell::Cell::new(0) };
     /// AutoAnchor's On place right-click edge.
     static AUTO_ANCHOR_RIGHT: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+    /// Block-In holds the sneak key while it places.
+    static BLOCK_IN_SNEAK: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
 }
 
 /// Keys physically held, through the key mapping (`KeyMapping.isDown` of
@@ -311,6 +314,14 @@ pub(crate) fn requests(
             runtime.scaffold_requests(&tick, &body, again)
         });
         out.extend(requests);
+    }
+    if BLOCK_IN_SNEAK.with(|sneak| sneak.get()) {
+        out.push(Request {
+            axis: Axis::Sneak,
+            owner: Owner::KeyHelper,
+            priority: 3,
+            pressed: true,
+        });
     }
     out
 }
@@ -1002,6 +1013,304 @@ fn auto_anchor_tick(game: &mut Game<'_>) {
     }
 }
 
+/// The reference's `blockPriorityIndex`: the block's display name (or id)
+/// against the priority list.
+fn block_in_priority(held: &crate::game::vape_rs::inventory::item_limit::HeldItem) -> usize {
+    let text = format!(
+        "{} {}",
+        held.display_name.to_lowercase(),
+        held.id.as_deref().unwrap_or("").to_lowercase()
+    );
+    if text.contains("wool") {
+        0
+    } else if text.contains("planks") {
+        2
+    } else if text.contains("sandstone") {
+        3
+    } else if text.contains("terracotta") || text.contains("stained_clay") {
+        4
+    } else if text.contains("end_stone") {
+        5
+    } else if text.contains("obsidian") {
+        6
+    } else if text.contains("stone") {
+        1
+    } else {
+        7
+    }
+}
+
+/// The reference's `selectBestBlockSlot`: the priority list, or the block
+/// hardness in Hardest mode; the stack size breaks ties.
+fn block_in_block_slot(game: &Game<'_>, options: &block_in::Options) -> i32 {
+    let mut best = -1;
+    let mut best_priority = usize::MAX;
+    let mut best_hardness = f32::NEG_INFINITY;
+    let mut best_count = 0i32;
+    for slot in 0..9usize {
+        let Some(stack) = game.inventory.get(slot).and_then(|s| s.as_ref()) else {
+            continue;
+        };
+        let Some(info) = game.res.items().get(&stack.item) else {
+            continue;
+        };
+        if info.block.is_none() || stack.count == 0 {
+            continue;
+        }
+        let held = crate::game::vape_combat::item_at(game, slot);
+        if options.use_blacklist
+            && crate::game::vape_rs::inventory::item_limit::matches(&options.blacklist, &held)
+        {
+            continue;
+        }
+        let count = stack.count as i32;
+        let better = if options.priority == block_in::Priority::Hardest {
+            let hardness = info
+                .block
+                .map_or(0.0, |state| game.res.facts().get(state).hardness);
+            hardness > best_hardness || (hardness == best_hardness && count > best_count)
+        } else {
+            let priority = block_in_priority(&held);
+            priority < best_priority || (priority == best_priority && count > best_count)
+        };
+        if better {
+            best = slot as i32;
+            best_priority = block_in_priority(&held);
+            best_hardness = info
+                .block
+                .map_or(0.0, |state| game.res.facts().get(state).hardness);
+            best_count = count;
+        }
+    }
+    best
+}
+
+/// The nearest bed's horizontal centre within the reference's 10-block scan.
+fn block_in_bed(game: &Game<'_>, feet: [f64; 3]) -> Option<[f64; 2]> {
+    let facts = game.res.facts();
+    let (fx, fy, fz) = (
+        feet[0].floor() as i32,
+        feet[1].floor() as i32,
+        feet[2].floor() as i32,
+    );
+    let mut best: Option<(f64, [f64; 2])> = None;
+    for dx in -10..10 {
+        for dz in -10..10 {
+            for dy in -3..3 {
+                let (x, z) = (fx + dx, fz + dz);
+                if !facts
+                    .get(game.world.block(x, fy + dy, z))
+                    .name
+                    .ends_with("_bed")
+                {
+                    continue;
+                }
+                let distance = f64::from(dx * dx + dz * dz);
+                if best.is_none_or(|(current, _)| distance < current) {
+                    best = Some((distance, [f64::from(x) + 0.5, f64::from(z) + 0.5]));
+                }
+            }
+        }
+    }
+    best.map(|(_, bed)| bed)
+}
+
+/// The enclosure cells still air with a visible solid support: the four
+/// cardinal cells around the player's feet block and the four above it.
+fn block_in_targets(
+    game: &Game<'_>,
+    options: &block_in::Options,
+    feet: [f64; 3],
+    eye: [f64; 3],
+) -> Vec<block_in::Placement> {
+    let facts = game.res.facts();
+    let solid = |pos: [i32; 3]| {
+        let state = facts.get(game.world.block(pos[0], pos[1], pos[2]));
+        state.full_collision && !state.replaceable
+    };
+    let replaceable = |pos: [i32; 3]| {
+        facts
+            .get(game.world.block(pos[0], pos[1], pos[2]))
+            .replaceable
+    };
+    let (fx, fy, fz) = (
+        feet[0].floor() as i32,
+        feet[1].floor() as i32,
+        feet[2].floor() as i32,
+    );
+    let mut out = Vec::new();
+    for y in [fy, fy + 1] {
+        for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let cell = [fx + dx, y, fz + dz];
+            if !replaceable(cell) {
+                continue;
+            }
+            let mut support = None;
+            for (offset, facing) in [
+                ([0, -1, 0], 1u8),
+                ([0, 1, 0], 0),
+                ([-1, 0, 0], 5),
+                ([1, 0, 0], 4),
+                ([0, 0, -1], 3),
+                ([0, 0, 1], 2),
+            ] {
+                let at = [
+                    cell[0] + offset[0],
+                    cell[1] + offset[1],
+                    cell[2] + offset[2],
+                ];
+                if !solid(at) {
+                    continue;
+                }
+                let point = block_in::face_center(at, facing);
+                let (dx, dy, dz) = (
+                    point[0] - eye[0],
+                    point[1] - eye[1],
+                    point[2] - eye[2],
+                );
+                let distance = (dx * dx + dy * dy + dz * dz).sqrt();
+                if distance <= 1.0e-4 {
+                    continue;
+                }
+                let direction = [dx / distance, dy / distance, dz / distance];
+                if game.clip_ray(eye, direction, distance + 0.01).is_some_and(|hit| {
+                    hit.pos == at && crystal_aura::facing_index(hit.face) == facing
+                }) {
+                    support = Some((at, facing));
+                    break;
+                }
+            }
+            if let Some((support, facing)) = support {
+                out.push(block_in::Placement {
+                    support,
+                    facing,
+                    place: cell,
+                });
+            }
+        }
+    }
+    let bed = if options.bed_finder {
+        block_in_bed(game, feet)
+    } else {
+        None
+    };
+    out.sort_by(|a, b| {
+        let key = |placement: &block_in::Placement| {
+            let dx = f64::from(placement.place[0]) - feet[0];
+            let dz = f64::from(placement.place[2]) - feet[2];
+            let toward_bed = bed.map_or(0.0, |bed| {
+                let (bx, bz) = (bed[0] - feet[0], bed[1] - feet[2]);
+                let length = (bx * bx + bz * bz).sqrt().max(1.0e-6);
+                (dx * bx + dz * bz) / length
+            });
+            (
+                i32::from(placement.place[1] != fy),
+                -toward_bed,
+                dx * dx + dz * dz,
+            )
+        };
+        key(a)
+            .partial_cmp(&key(b))
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    out
+}
+
+/// Block-In's host: the enclosure targets, the block slot, the managed
+/// crosshair, the shared rotation and the placement click.
+fn block_in_tick(game: &mut Game<'_>) {
+    let client = crate::game::vape_rs::core::client().clone();
+    if !with_client(&client, |runtime| runtime.enabled(ModuleId::BlockIn)) {
+        let keep = with_client(&client, |runtime| {
+            let options = block_in::Options::read(runtime.settings());
+            options.sneak && options.keep_sneak
+        });
+        let restore = with_client(&client, |runtime| runtime.block_in_release());
+        if let Some(slot) = restore
+            .and_then(|slot| usize::try_from(slot).ok())
+            .filter(|slot| *slot < 9)
+        {
+            game.selected = slot;
+        }
+        if !keep {
+            BLOCK_IN_SNEAK.with(|sneak| sneak.set(false));
+        }
+        return;
+    }
+    let options = with_client(&client, |runtime| {
+        block_in::Options::read(runtime.settings())
+    });
+    let Some(player) = game.player.as_ref() else {
+        return;
+    };
+    let (px, py, pz) = (player.position.x, player.position.y, player.position.z);
+    let eye = [px, py + f64::from(player.dimensions.eye_height), pz];
+    let view = (game.yaw, game.pitch);
+    let can_act = matches!(game.screen, crate::game::Screen::Playing)
+        && player.health.health() > 0.0;
+    let held_slot = game.selected as i32;
+    let block_slot = block_in_block_slot(game, &options);
+    let on_solid = game
+        .res
+        .facts()
+        .get(
+            game.world.block(
+                px.floor() as i32,
+                (py - 1.0).floor() as i32,
+                pz.floor() as i32,
+            ),
+        )
+        .full_collision;
+    let targets = block_in_targets(game, &options, [px, py, pz], eye);
+    let managed = with_client(&client, |runtime| runtime.managed_view(view));
+    let direction = rotation::direction(managed.0, managed.1);
+    let crosshair = game.clip_ray(eye, direction, 4.5).map(|hit| {
+        (
+            hit.pos,
+            crystal_aura::facing_index(hit.face),
+            hit.point,
+        )
+    });
+    let tick = block_in::Tick {
+        now_ms: with_client(&client, |runtime| runtime.now_ms()),
+        eye,
+        view,
+        on_solid,
+        held_slot,
+        block_slot,
+        crosshair,
+        targets,
+        can_act,
+    };
+    let actions = with_client(&client, |runtime| runtime.block_in_tick(&tick));
+    BLOCK_IN_SNEAK.with(|sneak| sneak.set(actions.sneak));
+    if let Some(slot) = actions
+        .select
+        .and_then(|slot| usize::try_from(slot).ok())
+        .filter(|slot| *slot < 9)
+    {
+        game.selected = slot;
+    }
+    if let Some(slot) = actions
+        .restore
+        .and_then(|slot| usize::try_from(slot).ok())
+        .filter(|slot| *slot < 9)
+    {
+        game.selected = slot;
+    }
+    if actions.uses > 0 && can_act {
+        let camera = (game.yaw, game.pitch);
+        (game.yaw, game.pitch) = managed;
+        if game.remote.is_some() {
+            game.remote_use(mod_api::InteractionAttempt::Press);
+        } else if game.using.is_none() {
+            let _ = game.use_with_hand();
+            game.use_delay = 4;
+        }
+        (game.yaw, game.pitch) = camera;
+    }
+}
+
 /// Client tick HEAD, before the movement writer.
 pub(crate) fn tick(game: &mut Game<'_>) {
     if game.player.is_none() {
@@ -1027,6 +1336,7 @@ pub(crate) fn tick(game: &mut Game<'_>) {
     });
     crystal_aura_tick(game);
     auto_anchor_tick(game);
+    block_in_tick(game);
     // AutoTotem's silent open holds the movement keys (and attack/use) from
     // the open until one "Silent move delay" after its close.
     let totem_hold = with_client(&client, |runtime| {
