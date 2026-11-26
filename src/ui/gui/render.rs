@@ -1212,7 +1212,13 @@ impl Gui {
                     text_width(&text) + 4.0
                 }
                 _ => {
-                    let rect = Rect(x + 6.0, y + 14.0, w - 12.0, 13.0);
+                    let editor_button = d.id == rules_editor::PROFILES;
+                    let rect = Rect(
+                        x + 6.0,
+                        y + 14.0,
+                        w - if editor_button { 48.0 } else { 12.0 },
+                        13.0,
+                    );
                     l.rounded(rect, BG);
                     if let Some(editor) = self.editor.as_ref().filter(|e| e.id == d.id) {
                         self.edit_paint(l, rect, &editor.text);
@@ -1243,6 +1249,13 @@ impl Gui {
                         l.clip = clip;
                     }
                     l.hit(rect, Hit::Edit(d.id.clone(), value.clone(), rect));
+                    if editor_button {
+                        l.button(
+                            Rect(x + w - 38.0, y + 14.0, 32.0, 13.0),
+                            "EDIT",
+                            Hit::RulesOpen,
+                        );
+                    }
                     0.0
                 }
             };
@@ -1473,6 +1486,148 @@ impl Gui {
                 l.hit(row, Hit::Cycle(rainbow, vec![json!(false), json!(true)]));
             }
         }
+        if let Some(editor) = &self.rules_editor {
+            self.rules_popup(view, l, editor);
+        }
+    }
+    /// The InventoryManager filter-rule editor: profiles, their item rules
+    /// (click to cycle the action, the cross removes one) and the new rule.
+    fn rules_popup(&self, view: &View, l: &mut Layout, editor: &rules_editor::RulesEditor) {
+        let profiles = rules_editor::profiles(view);
+        let (width, height) = self.logical();
+        let panel = Rect(
+            ((width - 300.0) / 2.0).max(4.0),
+            ((height - 200.0) / 2.0).max(4.0),
+            300.0_f32.min(width - 8.0),
+            200.0_f32.min(height - 8.0),
+        );
+        l.rounded(
+            Rect(panel.0 - 0.5, panel.1 - 0.5, panel.2 + 1.0, panel.3 + 1.0),
+            OUTLINE,
+        );
+        l.rounded(panel, BG);
+        l.hit(panel, Hit::Popup);
+        l.row_label(
+            panel.0 + 8.0,
+            panel.1 + 4.0,
+            14.0,
+            "Inventory filters",
+            FG,
+            ROW_SCALE,
+            Align::Left,
+        );
+        l.icon(panel.0 + panel.2 - 13.0, panel.1 + 6.0, 1.0, &CROSS, MUTED);
+        l.hit(
+            Rect(panel.0 + panel.2 - 18.0, panel.1 + 2.0, 16.0, 14.0),
+            Hit::RulesClose,
+        );
+        let selected = editor.selected(&profiles).map(|p| p.name.clone());
+        let mut px = panel.0 + 8.0;
+        for profile in &profiles {
+            let tab = Rect(px, panel.1 + 20.0, text_width(&profile.name) + 8.0, 13.0);
+            if tab.0 + tab.2 > panel.0 + panel.2 - 8.0 {
+                break;
+            }
+            let active = selected.as_deref() == Some(&profile.name);
+            if active {
+                l.rounded(tab, PRESSED);
+            }
+            l.row_label(
+                tab.0 + 4.0,
+                tab.1,
+                tab.3,
+                &profile.name,
+                if active { self.accent } else { MUTED },
+                FIELD_SCALE,
+                Align::Left,
+            );
+            l.hit(tab, Hit::RulesProfile(profile.name.clone()));
+            px += tab.2 + 4.0;
+        }
+        let add_y = panel.1 + panel.3 - 30.0;
+        let mut y = panel.1 + 38.0;
+        if let Some(profile) = editor.selected(&profiles) {
+            let room = ((add_y - y) / 15.0).floor().max(0.0) as usize;
+            for (i, rule) in profile.items.iter().enumerate().take(room) {
+                let row = Rect(panel.0 + 6.0, y, panel.2 - 12.0, 14.0);
+                if row.contains(self.hover) {
+                    l.fill(row, PRESSED);
+                }
+                l.row_label(
+                    row.0 + 2.0,
+                    row.1,
+                    row.3,
+                    &fit(&rule.filter.label(), row.2 - 60.0, FIELD_SCALE),
+                    FG,
+                    FIELD_SCALE,
+                    Align::Left,
+                );
+                l.row_label(
+                    row.0 + row.2 - 16.0,
+                    row.1,
+                    row.3,
+                    rule.action.name(),
+                    MUTED,
+                    SMALL_SCALE,
+                    Align::Right,
+                );
+                l.hit(Rect(row.0, row.1, row.2 - 16.0, row.3), Hit::RulesCycle(i));
+                l.icon(row.0 + row.2 - 8.0, row.1 + 4.5, 1.0, &CROSS, MUTED);
+                l.hit(
+                    Rect(row.0 + row.2 - 14.0, row.1, 14.0, row.3),
+                    Hit::RulesRemove(i),
+                );
+                y += 15.0;
+            }
+        }
+        l.row_label(
+            panel.0 + 8.0,
+            add_y - 12.0,
+            12.0,
+            &format!("New rule: {}", editor.action.name()),
+            MUTED,
+            SMALL_SCALE,
+            Align::Left,
+        );
+        let field = Rect(panel.0 + 8.0, add_y, panel.2 - 76.0, 14.0);
+        l.rounded(field, INSET);
+        let shown = if editor.item.is_empty() {
+            "item or matcher"
+        } else {
+            editor.item.as_str()
+        };
+        l.row_label(
+            field.0 + 4.0,
+            field.1,
+            field.3,
+            &fit(shown, field.2 - 8.0, FIELD_SCALE),
+            if editor.item.is_empty() { MUTED } else { FG },
+            FIELD_SCALE,
+            Align::Left,
+        );
+        if self.focus.as_deref() == Some("rules.item") {
+            let caret: String = editor.item.chars().take(self.cursor.caret).collect();
+            l.fill(
+                Rect(
+                    field.0 + 4.0 + text_advance(&caret, FIELD_SCALE),
+                    field.1 + 3.0,
+                    1.0,
+                    8.0,
+                ),
+                FG,
+            );
+        }
+        l.hit(field, Hit::Focus("rules.item".into(), field));
+        l.button(
+            Rect(panel.0 + panel.2 - 64.0, add_y, 28.0, 14.0),
+            "ADD",
+            Hit::RulesAdd,
+        );
+        l.button(
+            Rect(panel.0 + panel.2 - 32.0, add_y, 24.0, 14.0),
+            "ACT",
+            Hit::RulesAction,
+        );
     }
     pub(super) fn edit_paint(&self, l: &mut Layout, rect: Rect, value: &str) {
         let len = value.chars().count();

@@ -100,6 +100,7 @@ impl Gui {
                 || self.open_choice.take().is_some()
                 || self.open_color.take().is_some()
                 || self.profile_input.take().is_some()
+                || self.rules_editor.take().is_some()
             {
                 return Vec::new();
             }
@@ -318,6 +319,23 @@ impl Gui {
         };
         if self.confirm_delete.is_some() && !matches!(hit, Hit::ConfirmDelete | Hit::Cancel) {
             return Vec::new();
+        }
+        // A press outside the filter-rule editor closes it.
+        if self.rules_editor.is_some()
+            && !matches!(
+                hit,
+                Hit::RulesOpen
+                    | Hit::RulesClose
+                    | Hit::RulesAdd
+                    | Hit::RulesRemove(_)
+                    | Hit::RulesCycle(_)
+                    | Hit::RulesProfile(_)
+                    | Hit::RulesAction
+                    | Hit::Popup
+                    | Hit::Focus(..)
+            )
+        {
+            self.rules_editor = None;
         }
         if let Some((name, _)) = self
             .panel_rects
@@ -667,6 +685,70 @@ impl Gui {
             Hit::MapRemove(id, value, key) => {
                 let entries = map_remove(&map_entries(&value), &key);
                 return vec![Action::Set(id, map_value(&entries))];
+            }
+            Hit::RulesOpen => {
+                let profiles = rules_editor::profiles(view);
+                if profiles.is_empty() {
+                    self.status = "No inventory profile to edit".into();
+                } else {
+                    self.rules_editor = Some(rules_editor::RulesEditor::new(&profiles));
+                }
+            }
+            Hit::RulesClose => self.rules_editor = None,
+            Hit::RulesProfile(name) => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.profile = name;
+                }
+            }
+            Hit::RulesAction => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.cycle_action();
+                }
+            }
+            Hit::RulesAdd => {
+                if let Some(mut editor) = self.rules_editor.take() {
+                    let mut profiles = rules_editor::profiles(view);
+                    match rules_editor::add(&mut profiles, &editor) {
+                        Ok(()) => {
+                            editor.item.clear();
+                            self.rules_editor = Some(editor);
+                            return vec![Action::Set(
+                                rules_editor::PROFILES.into(),
+                                json!(rules_editor::text(&profiles)),
+                            )];
+                        }
+                        Err(message) => {
+                            self.status = message;
+                            self.rules_editor = Some(editor);
+                        }
+                    }
+                }
+            }
+            Hit::RulesRemove(index) => {
+                if let Some(editor) = self.rules_editor.take() {
+                    let mut profiles = rules_editor::profiles(view);
+                    let removed = rules_editor::remove(&mut profiles, &editor, index);
+                    self.rules_editor = Some(editor);
+                    if removed {
+                        return vec![Action::Set(
+                            rules_editor::PROFILES.into(),
+                            json!(rules_editor::text(&profiles)),
+                        )];
+                    }
+                }
+            }
+            Hit::RulesCycle(index) => {
+                if let Some(editor) = self.rules_editor.take() {
+                    let mut profiles = rules_editor::profiles(view);
+                    let cycled = rules_editor::cycle(&mut profiles, &editor, index);
+                    self.rules_editor = Some(editor);
+                    if cycled {
+                        return vec![Action::Set(
+                            rules_editor::PROFILES.into(),
+                            json!(rules_editor::text(&profiles)),
+                        )];
+                    }
+                }
             }
             Hit::Panel
             | Hit::Popup

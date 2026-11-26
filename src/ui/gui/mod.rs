@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 mod input;
 mod render;
+mod rules_editor;
 
 // Reference ThemeColors: frame body, inset, pressed row, outline and text.
 const BG: u32 = 0xff1a191a;
@@ -249,6 +250,14 @@ enum Hit {
     MapRemove(String, Value, String),
     /// The entry list's scroll window and how far it can scroll.
     MapEntries(String, f32),
+    /// Opens the InventoryManager filter-rule editor.
+    RulesOpen,
+    RulesProfile(String),
+    RulesAdd,
+    RulesRemove(usize),
+    RulesCycle(usize),
+    RulesAction,
+    RulesClose,
 }
 #[derive(Clone, Debug)]
 enum SettingDrag {
@@ -467,6 +476,7 @@ pub struct Gui {
     text_drag: Option<TextDrag>,
     open_choice: Option<String>,
     open_color: Option<String>,
+    rules_editor: Option<rules_editor::RulesEditor>,
     viewport: (f32, f32),
 }
 impl Default for Gui {
@@ -520,6 +530,7 @@ impl Default for Gui {
             text_drag: None,
             open_choice: None,
             open_color: None,
+            rules_editor: None,
             viewport: (400.0, 300.0),
         }
     }
@@ -631,6 +642,7 @@ impl Gui {
         self.text_drag = None;
         self.open_choice = None;
         self.open_color = None;
+        self.rules_editor = None;
         self.held.clear();
         self.raw_text_seen = false;
     }
@@ -660,6 +672,7 @@ impl Gui {
                 Some(f) if f.ends_with("#find") || f.ends_with("#replace") => {
                     Some(self.map_drafts.entry(f.to_string()).or_default())
                 }
+                Some("rules.item") => self.rules_editor.as_mut().map(|e| &mut e.item),
                 _ => None,
             }
         };
@@ -1037,6 +1050,100 @@ mod tests {
         click(&mut gui, &view, (122.0 + FRAME_WIDTH - 6.0, 16.0));
         assert!(!gui.edit_hidden);
     }
+    #[test]
+    fn the_inventory_editor_adds_cycles_and_removes_item_rules() {
+        use crate::inventory::rules::{parse_profiles, Filter, Matcher};
+        let mut gui = Gui {
+            open: true,
+            ..Gui::default()
+        };
+        let mut view = view();
+        let profiles = r#"[{"name":"Inventory #1","slots":[],"inventoryFilters":[{"itemFilter":"blocks","filterAction":"Drop item"}],"armor_mode":"No armor management"}]"#;
+        view.values = json!({
+            "client.search-bar": "Integrated",
+            rules_editor::PROFILES: profiles,
+            rules_editor::PRESETS: "[]",
+        });
+        view.modules.push(ModuleView {
+            id: "inventory.inventory-manager".into(),
+            name: "InventoryManager".into(),
+            category: "Inventory".into(),
+            enabled: true,
+            favorite: false,
+            visible: true,
+        });
+        view.definitions = vec![
+            Definition::new(
+                rules_editor::PROFILES,
+                "Inventory",
+                Kind::Text { max_chars: 4096 },
+                json!(profiles),
+            ),
+            Definition::new(
+                rules_editor::PRESETS,
+                "Presets",
+                Kind::Text { max_chars: 4096 },
+                json!("[]"),
+            ),
+        ];
+        // The fifth navigation row (20-high rows after the 22 header) opens
+        // the Inventory category.
+        click(&mut gui, &view, (30.0, 6.0 + NAV_HEADER_HEIGHT + 4.0 * ROW_HEIGHT + 10.0));
+        gui.selected = Some("inventory.inventory-manager".into());
+        let centre = |gui: &Gui, wanted: &dyn Fn(&Hit) -> bool| {
+            let (Rect(x, y, w, h), _) = gui.hits.iter().rev().find(|(_, hit)| wanted(hit)).unwrap();
+            (x + w / 2.0, y + h / 2.0)
+        };
+        gui.frame(&view, (400.0, 300.0));
+        let open = centre(&gui, &|hit| matches!(hit, Hit::RulesOpen));
+        assert!(click(&mut gui, &view, open).is_empty());
+        assert!(gui.rules_editor.is_some());
+        // The add field takes the filter text; ADD writes the profile JSON.
+        gui.frame(&view, (400.0, 300.0));
+        let field = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::Focus(f, _) if f == "rules.item"),
+        );
+        click(&mut gui, &view, field);
+        gui.commit_text("swords", false);
+        gui.frame(&view, (400.0, 300.0));
+        let add = centre(&gui, &|hit| matches!(hit, Hit::RulesAdd));
+        let actions = click(&mut gui, &view, add);
+        let [Action::Set(id, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        assert_eq!(id, rules_editor::PROFILES);
+        let text = value.as_str().unwrap();
+        let parsed = parse_profiles(text, &[]).unwrap();
+        assert_eq!(parsed[0].items.len(), 2);
+        assert_eq!(parsed[0].items[1].filter, Filter::Matcher(Matcher::Swords));
+        assert!(gui.rules_editor.as_ref().unwrap().item.is_empty());
+        // The static view takes the new JSON, then the first rule cycles and
+        // the second is removed.
+        view.values[rules_editor::PROFILES] = value.clone();
+        gui.frame(&view, (400.0, 300.0));
+        let cycle = centre(&gui, &|hit| matches!(hit, Hit::RulesCycle(0)));
+        let actions = click(&mut gui, &view, cycle);
+        let [Action::Set(_, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        let parsed = parse_profiles(value.as_str().unwrap(), &[]).unwrap();
+        assert_eq!(parsed[0].items[0].action, crate::inventory::rules::Action::Move);
+        view.values[rules_editor::PROFILES] = value.clone();
+        gui.frame(&view, (400.0, 300.0));
+        let remove = centre(&gui, &|hit| matches!(hit, Hit::RulesRemove(1)));
+        let actions = click(&mut gui, &view, remove);
+        let [Action::Set(_, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        assert_eq!(parse_profiles(value.as_str().unwrap(), &[]).unwrap()[0].items.len(), 1);
+        // The cross closes the editor; Escape also does.
+        gui.frame(&view, (400.0, 300.0));
+        let close = centre(&gui, &|hit| matches!(hit, Hit::RulesClose));
+        assert!(click(&mut gui, &view, close).is_empty());
+        assert!(gui.rules_editor.is_none());
+    }
+
     #[test]
     fn the_colour_popup_rainbow_switch_toggles_without_closing_it() {
         let mut gui = Gui {
