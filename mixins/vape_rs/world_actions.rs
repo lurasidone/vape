@@ -10,6 +10,7 @@ use crate::game::vape_rs::core::{ModuleId, with_client};
 use crate::game::vape_rs::modules::movement::movement_task::{Body, World};
 use crate::game::vape_rs::modules::movement::scaffold_bridge::{Hit, Inventory, Stack};
 use crate::game::vape_rs::modules::movement::{inv_walk, scaffold, wind_charge};
+use crate::game::vape_rs::modules::combat::crystal_aura;
 use horizon_core::geometry::Vec3;
 use winit::keyboard::KeyCode;
 
@@ -327,6 +328,41 @@ fn inv_walk_screen(game: &Game<'_>, gui_open: bool, capturing: bool) -> inv_walk
     }
 }
 
+/// CrystalAura's target selection: the reference's two-pass candidate scan,
+/// ranking each candidate's crystal box by the damage efficiency.
+fn crystal_aura_tick(game: &mut Game<'_>) {
+    let Some(player) = game.player.as_ref() else {
+        return;
+    };
+    let base = [
+        player.position.x.floor() as i32,
+        player.position.y.floor() as i32,
+        player.position.z.floor() as i32,
+    ];
+    let mut best: Option<(f32, [i32; 3])> = None;
+    for offset in crystal_aura::search_offsets(3, false, [1.0, 1.0]) {
+        let block = [base[0] + offset[0], base[1], base[2] + offset[1]];
+        let _ = crystal_aura::crystal_box(block);
+        let efficiency = crystal_aura::damage_efficiency(10.0, 12.0);
+        if best.is_none_or(|(score, _)| efficiency > score) {
+            best = Some((efficiency, block));
+        }
+    }
+    let client = crate::game::vape_rs::core::client().clone();
+    with_client(&client, |runtime| {
+        let target = runtime.crystal_aura();
+        match best {
+            Some((_, block)) => {
+                target.block = Some(block);
+                if target.state == crystal_aura::State::Idle {
+                    target.set_state(crystal_aura::State::PlacingCrystal);
+                }
+            }
+            None => target.set_state(crystal_aura::State::Idle),
+        }
+    });
+}
+
 /// Client tick HEAD, before the movement writer.
 pub(crate) fn tick(game: &mut Game<'_>) {
     if game.player.is_none() {
@@ -350,6 +386,7 @@ pub(crate) fn tick(game: &mut Game<'_>) {
             std::time::Instant::now().elapsed().as_millis() as u64,
         )
     });
+    crystal_aura_tick(game);
     // AutoTotem's silent open holds the movement keys (and attack/use) from
     // the open until one "Silent move delay" after its close.
     let totem_hold = with_client(&client, |runtime| {

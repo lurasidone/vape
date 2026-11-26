@@ -676,6 +676,10 @@ impl Runtime {
     pub fn bed_breaker_server_rotation(&self) -> Option<[i32; 3]> {
         self.bed_breaker.server_rotation()
     }
+    /// The CrystalAura target ledger.
+    pub fn crystal_aura(&mut self) -> &mut super::modules::combat::crystal_aura::Target {
+        &mut self.crystal_aura
+    }
     /// The host view and target angles of the bed rotation.
     pub fn bed_breaker_rotation(&self) -> Option<((f32, f32), (f32, f32))> {
         self.bed_breaker.rotation()
