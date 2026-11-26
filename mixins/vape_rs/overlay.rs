@@ -344,6 +344,24 @@ fn frame(
         height: batch.height,
     };
     let client = crate::game::vape_rs::core::client().clone();
+    let beds = with_client(&client, |runtime| runtime.bed_breaker_beds());
+    if !beds.is_empty() {
+        let inside: Vec<bool> = beds
+            .iter()
+            .map(|bed| {
+                let center = [
+                    bed[0] as f64 + 0.5,
+                    bed[1] as f64 + 0.5,
+                    bed[2] as f64 + 0.5,
+                ];
+                projection.project(center).is_some_and(|[x, y]| {
+                    (x - projection.width / 2.0).abs() <= 10.0
+                        && (y - projection.height / 2.0).abs() <= 10.0
+                })
+            })
+            .collect();
+        with_client(&client, |runtime| runtime.bed_breaker_set_inside(&inside));
+    }
     let (spawners_wanted, beds_wanted, entities_wanted, indicators_wanted) =
         with_client(&client, |r| {
             (

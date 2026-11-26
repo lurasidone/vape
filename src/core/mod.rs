@@ -619,6 +619,26 @@ impl Runtime {
             self.bed_breaker.reset();
         }
     }
+    pub fn bed_breaker_beds(&self) -> Vec<[i32; 3]> {
+        self.bed_breaker.beds()
+    }
+    pub fn bed_breaker_set_inside(&mut self, inside: &[bool]) {
+        self.bed_breaker.set_inside(inside);
+    }
+    pub fn bed_breaker_tick(
+        &mut self,
+        world: &impl super::modules::world::bed_breaker::WorldView,
+        now_ms: u64,
+    ) -> Option<bed_breaker_runtime::Target> {
+        if !self.enabled(ModuleId::BedBreaker) {
+            self.bed_breaker.reset();
+            return None;
+        }
+        let mode = super::modules::world::bed_breaker::Mode::read(&self.settings);
+        let beds = self.bed_breaker.beds();
+        let inside = self.bed_breaker.inside();
+        self.bed_breaker.tick(world, &beds, &inside, mode, now_ms)
+    }
     pub fn set_enabled(&mut self, module: ModuleId, enabled: bool) {
         if module == ModuleId::Panic {
             if enabled {

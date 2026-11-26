@@ -321,6 +321,13 @@ pub(crate) fn tick(game: &mut Game<'_>) {
         let beds = bed_scan(game);
         with_client(&client, |runtime| runtime.bed_breaker_scan(&beds));
     }
+    // BedBreaker's selection/cover runs after the scan.
+    let _ = with_client(&client, |runtime| {
+        runtime.bed_breaker_tick(
+            &BedWorld { game },
+            std::time::Instant::now().elapsed().as_millis() as u64,
+        )
+    });
     // AutoTotem's silent open holds the movement keys (and attack/use) from
     // the open until one "Silent move delay" after its close.
     let totem_hold = with_client(&client, |runtime| {
@@ -536,4 +543,72 @@ fn bed_scan(game: &Game<'_>) -> Vec<[i32; 3]> {
         }
     }
     beds
+}
+
+/// The BedBreaker host's block and hotbar queries.
+struct BedWorld<'g, 'a> {
+    game: &'g Game<'a>,
+}
+
+impl crate::game::vape_rs::modules::world::bed_breaker::WorldView for BedWorld<'_, '_> {
+    fn block(&self, pos: [i32; 3]) -> Option<&str> {
+        Some(
+            &*self
+                .game
+                .res
+                .facts()
+                .get(self.game.world.block(pos[0], pos[1], pos[2]))
+                .name,
+        )
+    }
+    fn bed_facing(
+        &self,
+        pos: [i32; 3],
+    ) -> Option<crate::game::vape_rs::modules::world::bed_breaker::Facing> {
+        use crate::game::vape_rs::modules::world::bed_breaker::Facing;
+        let bed = |x: i32, z: i32| {
+            self
+                .game
+                .res
+                .facts()
+                .get(self.game.world.block(x, pos[1], z))
+                .name
+                .ends_with("_bed")
+        };
+        for (dx, dz, facing) in [
+            (0, 1, Facing::South),
+            (0, -1, Facing::West),
+            (1, 0, Facing::North),
+            (-1, 0, Facing::East),
+        ] {
+            if bed(pos[0] + dx, pos[2] + dz) {
+                return Some(facing);
+            }
+        }
+        None
+    }
+    fn replaceable(&self, pos: [i32; 3]) -> bool {
+        self
+            .game
+            .res
+            .facts()
+            .get(self.game.world.block(pos[0], pos[1], pos[2]))
+            .replaceable
+    }
+    fn destroy_progress(&self, pos: [i32; 3], _slot: usize) -> f32 {
+        let facts = self
+            .game
+            .res
+            .facts()
+            .get(self.game.world.block(pos[0], pos[1], pos[2]));
+        horizon_items::mining::destroy_progress(facts.hardness, false, 1.0)
+    }
+    fn hotbar(&self, slot: usize) -> Option<String> {
+        self
+            .game
+            .inventory
+            .get(slot)
+            .and_then(Option::as_ref)
+            .map(|stack| stack.item.to_string())
+    }
 }

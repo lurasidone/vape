@@ -54,6 +54,21 @@ impl BedBreaker {
         }
     }
 
+    pub fn beds(&self) -> Vec<[i32; 3]> {
+        self.targets
+            .iter()
+            .map(|state| state.position.block())
+            .collect()
+    }
+    pub fn inside(&self) -> Vec<bool> {
+        self.targets.iter().map(|state| state.inside_reticle).collect()
+    }
+    pub fn set_inside(&mut self, inside: &[bool]) {
+        for (state, yes) in self.targets.iter_mut().zip(inside) {
+            state.inside_reticle = *yes;
+        }
+    }
+
     /// The reference's `onRender3D`/`onBedBreakerUpdate` pair: refresh the
     /// targets, animate visibility, select the last target inside the
     /// reticle, and resolve/finish the Hypixel cover.

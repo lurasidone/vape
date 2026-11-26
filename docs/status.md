@@ -75,9 +75,10 @@ some hook points moved. Current full build: `native-f1bb66f-76d3241d8036`.
   in the library/render crate).
 - **BedBreaker** is registered (`world.bed-breaker`) with its core types,
   cover selector, runtime target list and mode setting; the host scans beds
-  every 50 ticks (100 x/z, ±20 y, one half per pair). The reticle
-  projection, `Game::pick` claim, break rotation/movement and indicator
-  renderer remain.
+  every 50 ticks (100 x/z, ±20 y, one half per pair), and the overlay
+  projects their centres into the 20x20 reticle while the tick maintains
+  the target list with a host `WorldView`. The `Game::pick` claim, break
+  rotation/movement and indicator renderer remain.
 - **Not started modules** (CrystalAura, AutoAnchor, Block-In, the
   InventoryManager filter-rule editor, translations/fonts) can resume: the
   exact reference `3d600a48` / `4.21.43` is cloned at the sibling

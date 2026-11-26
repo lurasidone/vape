@@ -2939,3 +2939,14 @@ module's disable reset clears it. `cargo check --offline` and the native
 build (`native-f1bb66f-c173b776fbb0`) pass. The reticle selection, the
 `Game::pick` claim, the break rotation/movement fix and the indicator
 renderer remain.
+
+## 2026-11-26: BedBreaker reticle selection
+
+The overlay frame projects each scanned bed centre through the HUD
+`Projection` and marks the 20x20 reticle box; the client tick runs
+`BedBreaker::tick` with a host `WorldView` (block names, the bed facing from
+the neighbouring half, `replaceable`, hotbar names, and the bare-hand
+destroy progress for the Hypixel cover). `cargo check --offline` and the
+native build (`native-f1bb66f-b511bed93f59`) pass. The `Game::pick` claim,
+the break rotation/movement fix and the indicator renderer remain; the
+Hypixel cover's per-slot tool speed comes with the pick/break batch.
