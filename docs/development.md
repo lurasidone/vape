@@ -66,7 +66,14 @@ It uses a fresh working directory and isolated homes for each run, then captures
 python3 tools/bundle.py                 # dist/vape_rs-<version>.hnmod and .sha256
 python3 -I tools/launcher_build.py      # optional: build it the way the launcher does
 VAPE_RS_BUILD=launcher python3 tools/smoke_scenario.py /path/to/prepared/26.3
+VAPE_RS_SDK_VERSION=native-f1bb66f-<id> python3 tools/smoke_scenario.py /path/to/prepared/26.3
 ```
+
+`VAPE_RS_SDK_VERSION` runs the launcher-installed current-SDK build at
+`target/scenarios/sdk-validation-current/launcher/versions/<id>`; the
+prepared resources must be its matching 26.3 directory. This skips the
+xtask build identity (the version's `native-mods.json` is the identity)
+and is how the existing scenarios are re-run against the signed SDK.
 
 `bundle.py` packs the source-only bundle: `horizon-native.json` plus `mixins/vape_rs/` (only `.rs` and `.toml`, no game source or resources), with fixed timestamps so the same sources give the same bytes. The mod id is `vape_rs`, because the registry's ids allow only lowercase letters, digits and `_`. Horizon's own registry check accepts it (`cargo horizon-mod check dist/vape_rs-0.1.0-dev.hnmod`, built from the pinned Horizon). `launcher_build.py` follows the launcher's `native_mods::build` under target/launcher-build: it unpacks with the registry's path rules, runs `cargo install --git` for horizon-mixins at the bundle's pin, downloads GitHub's archive of the pinned Horizon commit, applies the mods, and builds `--profile release --features horizon-client/mods` with the launcher's Rust 1.99.1. `VAPE_RS_BUILD=launcher` makes the scenario tools run that executable.
 

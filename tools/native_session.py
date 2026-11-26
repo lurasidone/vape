@@ -11,14 +11,25 @@ ROOT = Path(__file__).resolve().parents[1]
 # VAPE_RS_BUILD=launcher runs the client tools/launcher_build.py built from the
 # .hnmod the way Horizon's launcher does; the default is xtask's fast build.
 LAUNCHER = os.environ.get('VAPE_RS_BUILD') == 'launcher'
-if LAUNCHER:
+# VAPE_RS_SDK_VERSION runs the launcher-installed current-SDK build, whose
+# horizon-ctl sits beside horizon-client; the scenario's resources argument
+# must be the matching prepared 26.3 directory.
+SDK_VERSION = os.environ.get('VAPE_RS_SDK_VERSION')
+SDK = bool(SDK_VERSION)
+if SDK:
+    VERSION = ROOT / 'target/scenarios/sdk-validation-current/launcher/versions' / SDK_VERSION
+    BINARY = VERSION / 'horizon-client'
+    CTL = VERSION / 'horizon-ctl'
+    BUILD_MANIFEST = VERSION / 'native-mods.json'
+elif LAUNCHER:
     BINARY = ROOT / 'target/launcher-build/target/release/horizon-client'
     BUILD_MANIFEST = ROOT / 'target/launcher-build/vape-rs-build.json'
+    CTL = ROOT / 'target/host-cargo/fast/horizon-ctl'
 else:
     BINARY = ROOT / 'target/host-cargo/fast/horizon-client'
     BUILD_MANIFEST = ROOT / 'target/host-cargo/fast/vape-rs-build.json'
-# The launcher builds only the client; horizon-ctl is not modded.
-CTL = ROOT / 'target/host-cargo/fast/horizon-ctl'
+    # The launcher builds only the client; horizon-ctl is not modded.
+    CTL = ROOT / 'target/host-cargo/fast/horizon-ctl'
 # The same pinned host without vape-rs (tools/plain_build.sh):
 # the "mod disabled" baseline for performance runs.
 PLAIN = ROOT / 'target/plain-cargo/fast'
@@ -34,6 +45,10 @@ class StaleBuild(RuntimeError):
 def verify_build(allow_stale=False):
     """Return the executable's build identity after checking it against the
     current sources. Raises StaleBuild unless allow_stale is set."""
+    if SDK:
+        if not BINARY.is_file() or not CTL.is_file():
+            raise StaleBuild(f'SDK build missing: {BINARY.parent}')
+        return json.loads(BUILD_MANIFEST.read_text())
     if not BINARY.is_file():
         raise StaleBuild('no executable; build first: cargo run -p xtask --locked --offline -- build')
     problems = []

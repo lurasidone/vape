@@ -2784,3 +2784,14 @@ cannot keep spoofing the old cover. `cargo check --offline` passes. The host sca
 reticle projection, the `Game::pick` mouse-over claim, the break
 rotation/movement fix and the indicator renderer are the next batch; the
 module is not registered yet.
+
+## 2026-11-26: scenario harness for the signed current SDK
+
+`tools/native_session.py` now accepts `VAPE_RS_SDK_VERSION=<version>`. It
+runs the launcher-installed `horizon-client`/`horizon-ctl` from
+`target/scenarios/sdk-validation-current/launcher/versions/<version>`, uses
+the version's `native-mods.json` as the build identity and takes the prepared
+26.3 resource directory the scenario already accepts. The old xtask and
+`VAPE_RS_BUILD=launcher` paths are unchanged. This is the fast path to re-run
+the existing scenario tools against the signed SDK instead of rebuilding or
+re-deriving the old-pin evidence; no module code changed.
