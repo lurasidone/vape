@@ -167,6 +167,11 @@ impl BedBreaker {
     pub fn set_rotation(&mut self, view: (f32, f32), target: (f32, f32)) {
         self.rotation = Some((view, target));
     }
+    /// Drop the parked rotation when the silent rotation is released, so the
+    /// movement remap stops as soon as the cover phase ends.
+    pub fn clear_rotation(&mut self) {
+        self.rotation = None;
+    }
     /// The view the silent rotation started from and its target angles.
     pub fn rotation(&self) -> Option<((f32, f32), (f32, f32))> {
         self.rotation

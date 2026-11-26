@@ -666,6 +666,7 @@ impl Runtime {
         );
     }
     pub fn release_bed_breaker_rotation(&mut self) {
+        self.bed_breaker.clear_rotation();
         rotation_runtime::Shared::of(&mut self.combat, &mut self.rotations)
             .release(Claimant::BedBreaker);
     }

@@ -296,6 +296,30 @@ impl Target {
     }
 }
 
+/// The reference's `isAlive`.
+pub fn is_alive(health: f32, removed: bool) -> bool {
+    !removed && health > 0.0
+}
+
+/// The reference's `isInRange`.
+pub fn in_range(distance: f64, range: f64) -> bool {
+    distance <= range
+}
+
+/// The reference's `statusPriority`: the highest priority wins across the
+/// two y-level searches.
+pub fn status_priority(status: Option<&str>) -> u8 {
+    match status {
+        None => 0,
+        Some("low eff") => 6,
+        Some("blocked" | "out range" | "no place") => 5,
+        Some("no candidate") => 4,
+        Some("no placement block") => 3,
+        Some("no target") => 2,
+        Some(_) => 1,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -367,5 +391,21 @@ mod tests {
         target.set_state(State::Idle);
         assert!(target.block.is_none() && target.tracked.is_none());
         assert_eq!(target.crystal_slot, -1);
+    }
+
+    #[test]
+    fn status_priority_prefers_low_efficiency_over_range() {
+        assert!(status_priority(Some("low eff")) > status_priority(Some("out range")));
+        assert_eq!(status_priority(None), 0);
+        assert_eq!(status_priority(Some("unknown")), 1);
+    }
+
+    #[test]
+    fn a_dead_or_removed_target_is_not_alive() {
+        assert!(!is_alive(0.0, false));
+        assert!(!is_alive(20.0, true));
+        assert!(is_alive(20.0, false));
+        assert!(in_range(4.0, 4.0));
+        assert!(!in_range(4.5, 4.0));
     }
 }

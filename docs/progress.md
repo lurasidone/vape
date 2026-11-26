@@ -2975,6 +2975,12 @@ rotation at the Hypixel cover centre when the module's `server_rotation` is
 set (released otherwise). `cargo check --offline` and the native build
 (`native-f1bb66f-5200d043cad6`) pass. The movement-key remap remains.
 
+## 2026-11-26: CrystalAura target predicates
+
+`isAlive`/`isInRange`/`statusPriority` port (10 tests). The bed remap's
+parked rotation is cleared on release, so a finished cover phase stops the
+movement remap instead of replaying stale axes.
+
 ## 2026-11-26: BedBreaker remap base and CrystalAura target
 
 The movement remap now uses the view the silent rotation started from (the
