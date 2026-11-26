@@ -386,6 +386,12 @@ impl TargetMemory {
     }
 }
 
+/// The reference's `computeDamageEfficiency`: the raw damage over the
+/// maximum the same diameter can deal, so candidates rank by fraction.
+pub fn damage_efficiency(raw_damage: f32, diameter: f32) -> f32 {
+    raw_damage / (8.0 * diameter + 1.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -507,5 +513,14 @@ mod tests {
         memory.remember(7, 1_000);
         assert_eq!(memory.get(2_200), Some(7));
         assert_eq!(memory.get(2_201), None);
+    }
+
+    #[test]
+    fn efficiency_is_the_fraction_of_the_maximum_damage() {
+        let diameter = 12.0;
+        let maximum = 8.0 * diameter + 1.0;
+        assert!((damage_efficiency(maximum, diameter) - 1.0).abs() < 1e-6);
+        assert!(damage_efficiency(maximum / 2.0, diameter) < 1.0);
+        assert_eq!(damage_efficiency(0.0, diameter), 0.0);
     }
 }
