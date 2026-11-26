@@ -2702,5 +2702,12 @@ too early. Restored `auto-heal-pre-motion` as a `HEAD` on the same function
 and moved the post-motion work to an `AFTER_CALL` on
 `self.remote_send_state_body` (a `RETURN` hook on `remote_send_state` fails
 with a double mutable borrow of `self`). Built through the signed Nov 22 SDK
-and launcher `0.2.108`: `native-f1bb66f-c3791074135e`. This is compile-only
-evidence; the AutoHeal host scenario is still pending, as requested.
+and launcher `0.2.108`: `native-f1bb66f-c3791074135e`. Validated AutoHeal's
+Replace potion path in a fresh LAN host/guest scenario at
+`target/scenarios/sdk-autoheal-lan-5nttlasn/`: the guest was damaged from
+20.0 to 10.0, a healing splash potion in the main inventory was swapped and
+thrown with the motion packet looking down, and the guest's health came back
+to **14.0** while its camera pitch stayed **90.0** and the potion count went
+to zero. Natural regeneration was off, so the 4.0 HP is the potion. The
+integrated single-player path is not covered: both hooks sit on
+`remote_send_state`, which only runs when `remote` is set.
