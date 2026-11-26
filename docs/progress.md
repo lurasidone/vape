@@ -2764,3 +2764,17 @@ the signed Nov 22 SDK and launcher `0.2.108`: `native-f1bb66f-cad62a9c97a8`,
 then `native-f1bb66f-c79ee8b7a9cd` with the occlusion fix. This is
 compile/integration evidence; the host scenario is deferred with the rest of
 the module tests, as requested.
+
+## 2026-11-26: BedBreaker core types and cover selector
+
+Ported the reference's head-half `BedTargetPosition`, `BedTargetRenderState`
+(visibility animation, break phase, cover target, obstruction point),
+`BedBreakPhase`, `BedCoverTarget` and `BedCoverTargetSelector` into
+`src/modules/world/bed_breaker.rs`. The selector takes the reference's
+`WorldView` queries (bed block and facing, replaceable cover positions, the
+player-relative destroy progress per hotbar slot, the hotbar stacks) and
+returns the cover with the best progress, or `None` when the bed is exposed.
+The module's Normal/Hypixel mode definition is included. `cargo check
+--offline` passes. The host scan, `Game::pick` mouse-over claim, break
+rotation/movement fix and the indicator renderer are the next batch; the
+module is not registered yet.
