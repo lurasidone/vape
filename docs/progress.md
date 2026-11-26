@@ -2718,10 +2718,11 @@ Tried the `smoke_scenario.py` Parkour walk on build
 `native-f1bb66f-c3791074135e` with `horizon-ctl key w down` over a stone
 runway at `target/scenarios/sdk-parkour-r5bgd2o3/`. The player walked off the
 runway and fell in both the Parkour-off and Parkour-on runs (peak `y=100.0`,
-end `y=99.0`), so the module never tapped jump. The cause is the harness, not
-the module: `vape_input_delays::host_view` reads the game's canonical physical
-keys, while `horizon-ctl key` inserts a control-socket key that the movement
-writer consumes directly. `forward` is therefore false in the Parkour check.
-The physical-key path remains unvalidated on this SDK; the old
-`NativeSession` input path is needed, or a scenario that injects a real key
-event. No module code changed.
+end `y=99.0`), so the module never tapped jump. Instrumented the decision in
+build `native-f1bb66f-d7fc926df308`: the `vape-rs parkour` log never ran,
+because `playing(game)` requires `game.focused` and the control-socket /
+offscreen launch never focuses the window. Parkour and the other
+input-delay modules gated by `playing` therefore cannot be exercised through
+this harness. Flipping `edge_ahead`'s near check to `!near && far` also did
+not change the result and was reverted. The visible focused-window
+`NativeSession` path is required for these modules; no module code changed.
