@@ -2979,7 +2979,9 @@ set (released otherwise). `cargo check --offline` and the native build
 
 `isAlive`/`isInRange`/`statusPriority` port (10 tests). The bed remap's
 parked rotation is cleared on release, so a finished cover phase stops the
-movement remap instead of replaying stale axes.
+movement remap instead of replaying stale axes. `cargo check --offline`, the
+10 crystal_aura tests and the native build (`native-f1bb66f-1fed41aae8e0`)
+pass.
 
 ## 2026-11-26: BedBreaker remap base and CrystalAura target
 
