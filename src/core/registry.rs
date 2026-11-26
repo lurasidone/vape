@@ -63,6 +63,7 @@ registry! {
     ChestSteal => "world.chest-steal", "ChestSteal", "World", None, [];
     FastPlace => "world.fast-place", "FastPlace", "World", None, [];
     BedBreaker => "world.bed-breaker", "BedBreaker", "World", None, [];
+    CrystalAura => "combat.crystal-aura", "CrystalAura", "Combat", None, [];
     Fullbright => "render.fullbright", "Fullbright", "Render", None, [];
     ClearWater => "render.clear-water", "Clear Water", "Render", None, [];
     AutoFish => "utility.auto-fish", "AutoFish", "World", None, [];

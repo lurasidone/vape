@@ -2975,6 +2975,12 @@ rotation at the Hypixel cover centre when the module's `server_rotation` is
 set (released otherwise). `cargo check --offline` and the native build
 (`native-f1bb66f-5200d043cad6`) pass. The movement-key remap remains.
 
+## 2026-11-26: CrystalAura registration
+
+`combat.crystal-aura` joins the registry (Combat, non-panel) with its
+Mode/range/self-damage/anti-suicide settings; the runtime holds the target
+ledger and resets it on disable. cargo check and 15 tests pass.
+
 ## 2026-11-26: CrystalAura search order
 
 The two-pass scan order (toward the target first, then every offset, the

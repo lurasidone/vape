@@ -133,6 +133,7 @@ pub struct Runtime {
     sprint: super::modules::combat::sprint::Sprint,
     anti_afk: super::modules::world::anti_afk::AntiAfk,
     bed_breaker: bed_breaker_runtime::BedBreaker,
+    crystal_aura: super::modules::combat::crystal_aura::Target,
     speed: super::modules::blatant::speed::State,
     long_jump: super::modules::blatant::long_jump::State,
     anti_fall: super::modules::blatant::anti_fall::State,
@@ -386,6 +387,7 @@ impl Default for Runtime {
             .chain(super::modules::combat::wtap::definitions())
             .chain(super::modules::world::anti_afk::definitions())
             .chain(super::modules::world::bed_breaker::definitions())
+            .chain(super::modules::combat::crystal_aura::definitions())
             .chain(super::modules::movement::definitions())
         {
             settings.define(definition).unwrap();
@@ -570,6 +572,7 @@ impl Default for Runtime {
             sprint: Default::default(),
             anti_afk: Default::default(),
             bed_breaker: Default::default(),
+            crystal_aura: Default::default(),
             speed: Default::default(),
             long_jump: Default::default(),
             anti_fall: Default::default(),
@@ -754,6 +757,7 @@ impl Runtime {
                 ModuleId::Sprint => self.sprint.reset(),
                 ModuleId::AntiAfk => self.anti_afk.reset(),
                 ModuleId::BedBreaker => self.bed_breaker.reset(),
+                ModuleId::CrystalAura => self.crystal_aura.reset(),
                 ModuleId::Speed => self.speed.reset(),
                 ModuleId::LongJump => self.long_jump.reset(),
                 ModuleId::AntiFall => self.anti_fall.reset(),
@@ -2460,6 +2464,7 @@ impl Runtime {
                     super::ui::hud::Content::Potions { effects }
                 }
                 ModuleId::NoHurtCamera
+                | ModuleId::CrystalAura
                 | ModuleId::AutoTool
                 | ModuleId::AutoArmor
                 | ModuleId::AutoTotem

@@ -3,6 +3,42 @@
 // The reference's placement/target submodules run on top of these: the
 // damage model decides whether a placement or break is safe, and the
 // interaction point is the ray the rotation aims at.
+use super::super::super::core::settings::{Definition, Settings};
+use serde_json::Value;
+
+pub const ID: &str = "combat.crystal-aura";
+
+pub fn definitions() -> Vec<Definition> {
+    vec![
+        Definition::choice(&format!("{ID}.mode"), "Mode", &["Auto", "Manual"], "Auto"),
+        Definition::number(&format!("{ID}.range"), "Range", 1.0, 4.5, 6.0, 0.1),
+        Definition::number(
+            &format!("{ID}.max-self-damage"),
+            "Max self damage",
+            1.0,
+            12.0,
+            20.0,
+            0.5,
+        ),
+        Definition::boolean(&format!("{ID}.anti-suicide"), "Anti suicide", true),
+    ]
+}
+
+/// The reference's `Mode` (Auto/Manual submodules).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Mode {
+    Auto,
+    Manual,
+}
+
+impl Mode {
+    pub fn read(settings: &Settings) -> Self {
+        match settings.get(&format!("{ID}.mode")).and_then(Value::as_str) {
+            Some("Manual") => Self::Manual,
+            _ => Self::Auto,
+        }
+    }
+}
 
 /// The reference's `ExplosionType` powers.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
