@@ -3136,6 +3136,16 @@ disables.
 `cargo test --offline --lib` passes 503 tests (5 block_in); the native SDK
 build (`native-f1bb66f-6fc49a990480`) compiles; the new
 `tools/block_in_scenario.py` passes **7/7** in a fresh isolated world: the
-eight walls around the player are stone and the module disables. The
-reference's full placement-path search and the enclosure movement task
+eight walls around the player are stone and the module disables.
+
+The reference's full placement-path search and the enclosure movement task
 remain.
+
+## 2026-11-26: Indicators hit-only simulation check
+
+The render scenario's Hit-Only arrow (spawn at (0.5, 101.2, -12), motion
+(0, 0.3, 1.5), the player at (0.5, 100, 0.5)) is a direct hit in
+`indicators::closest`: the new regression test pins the hit. The scenario's
+Hit-Only screenshot check still fails, so the remaining cause is the host
+marker/projection or the scenario's capture, not the projectile simulation.
+`cargo test --offline --lib` passes 504 tests.

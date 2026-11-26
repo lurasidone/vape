@@ -505,6 +505,16 @@ mod tests {
     }
 
     #[test]
+    fn the_scenario_arrow_hits_the_player() {
+        let p = arrow_at([0.5, 101.2, -12.0], [0.0, 0.3, 1.5]);
+        let me = Me {
+            bounds: ([0.2, 100.0, 0.2], [0.8, 101.8, 0.8]),
+            feet: [0.5, 100.0, 0.5],
+        };
+        assert_eq!(closest(&p, &me, 0.0, &mut no_blocks), 0.0);
+    }
+
+    #[test]
     fn fireballs_fly_straight_for_a_hundred_steps() {
         let mut ball = arrow_at([0.0, 1.0, 50.0], [0.0, 0.0, -1.0]);
         ball.kind = Kind::Fireball { large: false };
