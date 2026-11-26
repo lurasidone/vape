@@ -2975,6 +2975,14 @@ rotation at the Hypixel cover centre when the module's `server_rotation` is
 set (released otherwise). `cargo check --offline` and the native build
 (`native-f1bb66f-5200d043cad6`) pass. The movement-key remap remains.
 
+## 2026-11-26: CrystalAura action path
+
+The selection tick now acts: `BreakingCrystal` attacks the tracked crystal
+through the host's `vape_combat_remote::attack` (packet + swing + WTap), and
+`PlacingCrystal` presses the crosshair use through `remote_use`. The
+rotation and the real world/damage selection remain. Native build
+(`native-f1bb66f-6d5d7ea1b7f4`) passes.
+
 ## 2026-11-26: CrystalAura selection tick
 
 The client tick HEAD now runs `crystal_aura_tick`: it scans the two-pass

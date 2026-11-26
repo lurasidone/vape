@@ -353,7 +353,7 @@ fn crystal_aura_tick(game: &mut Game<'_>) {
         }
     }
     let client = crate::game::vape_rs::core::client().clone();
-    with_client(&client, |runtime| {
+    let (state, tracked) = with_client(&client, |runtime| {
         let target = runtime.crystal_aura();
         match best {
             Some((_, block)) => {
@@ -364,7 +364,21 @@ fn crystal_aura_tick(game: &mut Game<'_>) {
             }
             None => target.set_state(crystal_aura::State::Idle),
         }
+        (target.state, target.tracked)
     });
+    // The crosshair place and the attack go through the host's own paths,
+    // so the packet, the swing and WTap behave as a real click.
+    match state {
+        crystal_aura::State::BreakingCrystal => {
+            if let Some(id) = tracked {
+                let _ = crate::game::remote::vape_combat_remote::attack(game, id);
+            }
+        }
+        crystal_aura::State::PlacingCrystal => {
+            game.remote_use(mod_api::InteractionAttempt::Press);
+        }
+        _ => {}
+    }
 }
 
 /// Client tick HEAD, before the movement writer.
