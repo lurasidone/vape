@@ -2711,3 +2711,17 @@ to **14.0** while its camera pitch stayed **90.0** and the potion count went
 to zero. Natural regeneration was off, so the 4.0 HP is the potion. The
 integrated single-player path is not covered: both hooks sit on
 `remote_send_state`, which only runs when `remote` is set.
+
+## 2026-11-25: Parkour scenario blocked by the control-socket input path
+
+Tried the `smoke_scenario.py` Parkour walk on build
+`native-f1bb66f-c3791074135e` with `horizon-ctl key w down` over a stone
+runway at `target/scenarios/sdk-parkour-r5bgd2o3/`. The player walked off the
+runway and fell in both the Parkour-off and Parkour-on runs (peak `y=100.0`,
+end `y=99.0`), so the module never tapped jump. The cause is the harness, not
+the module: `vape_input_delays::host_view` reads the game's canonical physical
+keys, while `horizon-ctl key` inserts a control-socket key that the movement
+writer consumes directly. `forward` is therefore false in the Parkour check.
+The physical-key path remains unvalidated on this SDK; the old
+`NativeSession` input path is needed, or a scenario that injects a real key
+event. No module code changed.

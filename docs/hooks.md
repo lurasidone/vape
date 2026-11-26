@@ -4,6 +4,33 @@ Current audited configuration: **38 hooks (37 HEAD + 1 MODIFY_ARG), 25 support m
 
 The manifest is authoritative for exact targets and bindings. All targets resolve against the committed pristine export under target; neither adjacent checkout is modified. The audit removes exactly the declared helpers and modules, rejects any owned state, then checks that the original host AST and other source hashes are restored. Runtime compilation and actual gameplay evidence are separate checks.
 
+
+## Current SDK candidate (2026-11-25)
+
+The table below is the `8f91f896` catalogue. The signed Nov 22 SDK
+(`f1bb66f353cf67f2aa4665293fc75c8d91186fc7`, launcher `0.2.108`, build
+`native-f1bb66f-c3791074135e`) moves some hook points; the manifest remains
+authoritative.
+
+- `send-state-ground` is now a `MODIFY_ARG` on the `self.send_body(packet)`
+  call inside `Game<'_>::send` (argument 0). It applies the NoFall ground
+  claim to `MovePlayerPos`/`MovePlayerPosRot`/`MovePlayerRot` only, and the
+  managed rotation to the two rotation packets. It folds the old
+  `send-state-rotation` row.
+- `no-slowdown` is now an `AFTER_CALL` on `self.sync_player_body` inside
+  `horizon_client::game::remote::tick::Game::tick_local_player_body`; it
+  clears the host's item-use fields before the library motion tick.
+- `auto-heal-pre-motion` is restored as a `HEAD` on `remote_send_state`, and
+  `auto-heal-post-motion` is an `AFTER_CALL` on `self.remote_send_state_body`
+  (a `RETURN` on the delegating function double-borrows `self`).
+- `timer-advance` is replaced by `current-timer-steps`
+  (`MODIFY_VARIABLE` on `Game<'_>::client_tick_steps`).
+- Not applied on this SDK: `fly-move`, `inv-walk-keys`, `safe-walk-edge`,
+  `on-top-hook` and `overlay-hook` (library-crate split; `move_self` is not
+  replaceable), `target-info-pot-launch` (the target is gone), and the old
+  `send-state-rotation` (folded into `send-state-ground`). See
+  `docs/decisions.md` (2026-11-25).
+
 ## Hooks
 
 | ID | Exact target | Behavior |
