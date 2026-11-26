@@ -263,6 +263,8 @@ enum Hit {
     RulesConditionOp(usize),
     RulesGroup(usize),
     RulesNewGroup,
+    RulesPick,
+    RulesMatcher(crate::inventory::rules::Matcher),
     RulesAdd,
     RulesRemove(usize),
     RulesCycle(usize),
@@ -1010,6 +1012,38 @@ mod tests {
         let (Rect(x, y, w, h), _) = gui.hits.iter().rev().find(|(_, hit)| wanted(hit)).unwrap();
         (x + w / 2.0, y + h / 2.0)
     }
+    fn editor_view() -> View {
+        let profiles = r#"[{"name":"Inventory #1","slots":[],"inventoryFilters":[{"itemFilter":"blocks","filterAction":"Drop item"}],"armor_mode":"No armor management"}]"#;
+        let mut view = view();
+        view.values = json!({
+            "client.search-bar": "Integrated",
+            rules_editor::PROFILES: profiles,
+            rules_editor::PRESETS: "[]",
+        });
+        view.modules.push(ModuleView {
+            id: "inventory.inventory-manager".into(),
+            name: "InventoryManager".into(),
+            category: "Inventory".into(),
+            enabled: true,
+            favorite: false,
+            visible: true,
+        });
+        view.definitions = vec![
+            Definition::new(
+                rules_editor::PROFILES,
+                "Inventory",
+                Kind::Text { max_chars: 4096 },
+                json!(profiles),
+            ),
+            Definition::new(
+                rules_editor::PRESETS,
+                "Presets",
+                Kind::Text { max_chars: 4096 },
+                json!("[]"),
+            ),
+        ];
+        view
+    }
     #[test]
     fn navigation_opens_category_frames_whose_rows_toggle_modules() {
         let mut gui = Gui {
@@ -1071,35 +1105,7 @@ mod tests {
             open: true,
             ..Gui::default()
         };
-        let mut view = view();
-        let profiles = r#"[{"name":"Inventory #1","slots":[],"inventoryFilters":[{"itemFilter":"blocks","filterAction":"Drop item"}],"armor_mode":"No armor management"}]"#;
-        view.values = json!({
-            "client.search-bar": "Integrated",
-            rules_editor::PROFILES: profiles,
-            rules_editor::PRESETS: "[]",
-        });
-        view.modules.push(ModuleView {
-            id: "inventory.inventory-manager".into(),
-            name: "InventoryManager".into(),
-            category: "Inventory".into(),
-            enabled: true,
-            favorite: false,
-            visible: true,
-        });
-        view.definitions = vec![
-            Definition::new(
-                rules_editor::PROFILES,
-                "Inventory",
-                Kind::Text { max_chars: 4096 },
-                json!(profiles),
-            ),
-            Definition::new(
-                rules_editor::PRESETS,
-                "Presets",
-                Kind::Text { max_chars: 4096 },
-                json!("[]"),
-            ),
-        ];
+        let mut view = editor_view();
         // The fifth navigation row (20-high rows after the 22 header) opens
         // the Inventory category.
         click(&mut gui, &view, (30.0, 6.0 + NAV_HEADER_HEIGHT + 4.0 * ROW_HEIGHT + 10.0));
@@ -1311,6 +1317,44 @@ mod tests {
         let close = centre(&gui, &|hit| matches!(hit, Hit::RulesClose));
         assert!(click(&mut gui, &view, close).is_empty());
         assert!(gui.rules_editor.is_none());
+    }
+
+    #[test]
+    fn the_matcher_picker_fills_the_item_filter() {
+        use crate::inventory::rules::{parse_profiles, Filter, Matcher};
+        let mut gui = Gui {
+            open: true,
+            ..Gui::default()
+        };
+        let mut view = editor_view();
+        click(&mut gui, &view, (30.0, 6.0 + NAV_HEADER_HEIGHT + 4.0 * ROW_HEIGHT + 10.0));
+        gui.selected = Some("inventory.inventory-manager".into());
+        gui.frame(&view, (400.0, 300.0));
+        let open = centre(&gui, &|hit| matches!(hit, Hit::RulesOpen));
+        assert!(click(&mut gui, &view, open).is_empty());
+        gui.frame(&view, (400.0, 300.0));
+        let pick = centre(&gui, &|hit| matches!(hit, Hit::RulesPick));
+        assert!(click(&mut gui, &view, pick).is_empty());
+        assert!(gui.rules_editor.as_ref().unwrap().picker);
+        gui.frame(&view, (400.0, 300.0));
+        let swords = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::RulesMatcher(Matcher::Swords)),
+        );
+        assert!(click(&mut gui, &view, swords).is_empty());
+        assert_eq!(gui.rules_editor.as_ref().unwrap().item, "swords");
+        assert!(!gui.rules_editor.as_ref().unwrap().picker);
+        gui.frame(&view, (400.0, 300.0));
+        let add = centre(&gui, &|hit| matches!(hit, Hit::RulesAdd));
+        let actions = click(&mut gui, &view, add);
+        let [Action::Set(_, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        let parsed = parse_profiles(value.as_str().unwrap(), &[]).unwrap();
+        assert_eq!(
+            parsed[0].items.last().unwrap().filter,
+            Filter::Matcher(Matcher::Swords)
+        );
     }
 
     #[test]

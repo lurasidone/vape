@@ -340,6 +340,8 @@ impl Gui {
                     | Hit::RulesConditionOp(_)
                     | Hit::RulesGroup(_)
                     | Hit::RulesNewGroup
+                    | Hit::RulesPick
+                    | Hit::RulesMatcher(_)
                     | Hit::RulesAction
                     | Hit::Popup
                     | Hit::Focus(..)
@@ -837,6 +839,17 @@ impl Gui {
                         )];
                     }
                     self.rules_editor = Some(editor);
+                }
+            }
+            Hit::RulesPick => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.picker = !editor.picker;
+                }
+            }
+            Hit::RulesMatcher(matcher) => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.item = matcher.id().into();
+                    editor.picker = false;
                 }
             }
             Hit::RulesAction => {

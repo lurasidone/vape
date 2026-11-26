@@ -253,6 +253,8 @@ pub struct RulesEditor {
     pub group: usize,
     /// The kind of the next preset condition.
     pub kind: ConditionKind,
+    /// The matcher picker is open over the editor.
+    pub picker: bool,
 }
 
 impl RulesEditor {
@@ -266,6 +268,7 @@ impl RulesEditor {
             preset: None,
             group: 0,
             kind: ConditionKind::Durability,
+            picker: false,
         }
     }
 

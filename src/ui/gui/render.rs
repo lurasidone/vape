@@ -1772,7 +1772,7 @@ impl Gui {
             field.0 + 4.0,
             field.1,
             field.3,
-            &fit(shown, field.2 - 8.0, FIELD_SCALE),
+            &fit(shown, field.2 - 24.0, FIELD_SCALE),
             if editor.item.is_empty() { MUTED } else { FG },
             FIELD_SCALE,
             Align::Left,
@@ -1790,6 +1790,11 @@ impl Gui {
             );
         }
         l.hit(field, Hit::Focus("rules.item".into(), field));
+        l.icon(field.0 + field.2 - 11.0, field.1 + 4.5, 0.8, &DOWN, MUTED);
+        l.hit(
+            Rect(field.0 + field.2 - 16.0, field.1 + 1.0, 14.0, 12.0),
+            Hit::RulesPick,
+        );
         l.button(
             Rect(panel.0 + panel.2 - 64.0, add_y, 28.0, 14.0),
             if editor.tab == rules_editor::Tab::Slots {
@@ -1805,6 +1810,68 @@ impl Gui {
                 "ACT",
                 Hit::RulesAction,
             );
+        }
+        if editor.picker {
+            use crate::inventory::rules::{Group, Matcher};
+            let list = Rect(panel.0 + 8.0, panel.1 + 36.0, panel.2 - 16.0, panel.3 - 70.0);
+            l.rounded(
+                Rect(list.0 - 0.5, list.1 - 0.5, list.2 + 1.0, list.3 + 1.0),
+                OUTLINE,
+            );
+            l.rounded(list, BG);
+            l.hit(list, Hit::Popup);
+            let half = (list.2 - 8.0) / 2.0;
+            let mut y = list.1 + 2.0;
+            for group in [
+                Group::Hidden,
+                Group::Weapons,
+                Group::Tools,
+                Group::Food,
+                Group::Blocks,
+                Group::Armor,
+            ] {
+                l.row_label(
+                    list.0 + 4.0,
+                    y,
+                    9.0,
+                    group.label(),
+                    FAINT,
+                    SMALL_SCALE,
+                    Align::Left,
+                );
+                y += 9.0;
+                let matchers: Vec<Matcher> = Matcher::ALL
+                    .iter()
+                    .copied()
+                    .filter(|m| m.group() == group)
+                    .collect();
+                for (i, matcher) in matchers.iter().enumerate() {
+                    let row = Rect(
+                        list.0 + 4.0 + (i % 2) as f32 * half,
+                        y + (i / 2) as f32 * 9.0,
+                        half - 2.0,
+                        9.0,
+                    );
+                    if row.contains(self.hover) {
+                        l.fill(row, PRESSED);
+                    }
+                    l.row_label(
+                        row.0 + 2.0,
+                        row.1,
+                        row.3,
+                        matcher.name(),
+                        if editor.item == matcher.id() {
+                            self.accent
+                        } else {
+                            FG
+                        },
+                        SMALL_SCALE,
+                        Align::Left,
+                    );
+                    l.hit(row, Hit::RulesMatcher(*matcher));
+                }
+                y += matchers.len().div_ceil(2) as f32 * 9.0;
+            }
         }
     }
     pub(super) fn edit_paint(&self, l: &mut Layout, rect: Rect, value: &str) {

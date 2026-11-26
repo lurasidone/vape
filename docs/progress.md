@@ -3154,8 +3154,10 @@ The InventoryManager's "Inventory" setting has an EDIT button that opens the
 filter-rule editor popup: the profile tabs, the selected profile's item rules
 (each row's filter label, click to cycle the action, the cross removes it), the
 new-rule action cycle and an ADD row (a matcher id/name or a concrete item id).
-A SLOTS tab lists the nine hotbar slots with their filters; selecting one and
-SET applies the field's filter to that slot.
+The field's down arrow opens the matcher picker: the 17 registered matchers
+listed by group (Hidden/Weapons/Tools/Food/Blocks/Armor); clicking one fills
+the field with its id. A SLOTS tab lists the nine hotbar slots with their
+filters; selecting one and SET applies the field's filter to that slot.
 The edits write the `inventory.inventory-manager.profiles` JSON through the
 runtime's own `Profile`/`Rule` model, so the parser, presets and slot rules stay
 the single source of truth. The reference's shared-preset condition builder
@@ -3180,7 +3182,8 @@ removes a condition. The item
 tab's preset hint cycles the custom rule (None and each preset); a new rule
 references the selected preset by uuid, resolved from the presets setting. The
 reference's per-entry text editing (individual entries with their own controls)
-and the item-picker classes remain. Opening
+and its item-specific picker classes (the port's picker lists the registered
+matchers) remain. Opening
 the editor with the default empty profiles setting creates the reference's
 "Inventory #1" profile, so the editor is usable from a fresh config. Only a
 truly empty profiles/presets text is replaced; a text the model cannot parse
