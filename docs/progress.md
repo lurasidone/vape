@@ -2975,6 +2975,14 @@ rotation at the Hypixel cover centre when the module's `server_rotation` is
 set (released otherwise). `cargo check --offline` and the native build
 (`native-f1bb66f-5200d043cad6`) pass. The movement-key remap remains.
 
+## 2026-11-26: CrystalAura real selection
+
+The selection now needs an alive mob within the configured range and only
+accepts a crystal-base block whose unblocked self-damage (conservative)
+passes the anti-suicide/max-self-damage checks. Settings read from the
+runtime. Native build (`native-f1bb66f-26f9e211afb4`) passes; place/attack
+remain gated on the rotation and the reference's delay timers.
+
 ## 2026-11-26: CrystalAura action gate
 
 The documented place/attack path is now disabled off the placeholder

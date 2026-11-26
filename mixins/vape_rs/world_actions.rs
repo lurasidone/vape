@@ -328,8 +328,8 @@ fn inv_walk_screen(game: &Game<'_>, gui_open: bool, capturing: bool) -> inv_walk
     }
 }
 
-/// CrystalAura's target selection: the reference's two-pass candidate scan,
-/// ranking each candidate's crystal box by the damage efficiency.
+/// CrystalAura's target selection: an alive mob in range, then the nearest
+/// crystal-base block whose explosion is safe for the player.
 fn crystal_aura_tick(game: &mut Game<'_>) {
     let client = crate::game::vape_rs::core::client().clone();
     if !with_client(&client, |runtime| runtime.enabled(ModuleId::CrystalAura)) {
@@ -338,25 +338,81 @@ fn crystal_aura_tick(game: &mut Game<'_>) {
     let Some(player) = game.player.as_ref() else {
         return;
     };
-    let base = [
-        player.position.x.floor() as i32,
-        player.position.y.floor() as i32,
-        player.position.z.floor() as i32,
-    ];
-    let mut best: Option<(f32, [i32; 3])> = None;
-    for offset in crystal_aura::search_offsets(3, false, [1.0, 1.0]) {
-        let block = [base[0] + offset[0], base[1], base[2] + offset[1]];
-        let _ = crystal_aura::crystal_box(block);
-        let efficiency = crystal_aura::damage_efficiency(10.0, 12.0);
-        if best.is_none_or(|(score, _)| efficiency > score) {
-            best = Some((efficiency, block));
+    let (range, max_self_damage, anti_suicide) = with_client(&client, |runtime| {
+        let settings = runtime.settings();
+        let number = |suffix: &str, default: f64| {
+            settings
+                .get(&format!("{}.{suffix}", crystal_aura::ID))
+                .and_then(serde_json::Value::as_f64)
+                .unwrap_or(default)
+        };
+        (
+            number("range", 4.5),
+            number("max-self-damage", 12.0),
+            settings
+                .get(&format!("{}.anti-suicide", crystal_aura::ID))
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(true),
+        )
+    });
+    let (px, py, pz) = (player.position.x, player.position.y, player.position.z);
+    let eye = [px, py + f64::from(player.dimensions.eye_height), pz];
+    let health = player.health.health();
+    let absorption = player.health.absorption();
+    let distance = |mob: &horizon_client::mobs::Mob| {
+        let (dx, dy, dz) = (
+            mob.position.x - px,
+            mob.position.y - py,
+            mob.position.z - pz,
+        );
+        (dx * dx + dy * dy + dz * dz).sqrt()
+    };
+    let has_target = game.mobs.iter().any(|mob| {
+        mob.alive() && crystal_aura::in_range(distance(mob), range)
+    });
+    let facts = game.res.facts();
+    let is_base = |block: [i32; 3]| {
+        crystal_aura::is_crystal_base(
+            &facts
+                .get(game.world.block(block[0], block[1], block[2]))
+                .name,
+        )
+    };
+    let base = [px.floor() as i32, py.floor() as i32, pz.floor() as i32];
+    let mut best: Option<[i32; 3]> = None;
+    if has_target {
+        for offset in crystal_aura::search_offsets(3, false, [1.0, 1.0]) {
+            let block = [base[0] + offset[0], base[1], base[2] + offset[1]];
+            if !is_base(block) {
+                continue;
+            }
+            let explosion = [
+                f64::from(block[0]) + 0.5,
+                f64::from(block[1]) + 1.0,
+                f64::from(block[2]) + 0.5,
+            ];
+            // The unblocked density is conservative: it overestimates the
+            // self damage, so only clear placements pass.
+            let damage = crystal_aura::explosion_damage(
+                crystal_aura::ExplosionType::Crystal,
+                explosion,
+                eye,
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+            );
+            if crystal_aura::self_damage_safe(damage, health, absorption, anti_suicide, max_self_damage)
+            {
+                best = Some(block);
+                break;
+            }
         }
     }
-    let client = crate::game::vape_rs::core::client().clone();
     with_client(&client, |runtime| {
         let target = runtime.crystal_aura();
         match best {
-            Some((_, block)) => {
+            Some(block) => {
                 target.block = Some(block);
                 if target.state == crystal_aura::State::Idle {
                     target.set_state(crystal_aura::State::PlacingCrystal);
@@ -365,9 +421,8 @@ fn crystal_aura_tick(game: &mut Game<'_>) {
             None => target.set_state(crystal_aura::State::Idle),
         }
     });
-    // No use/attack fires off the placeholder selection: the real selector
-    // (world `is_crystal_base`, range, self-damage, the rotation to the
-    // interaction point and the reference's delay timers) must land first.
+    // No use/attack fires off this selection yet: the rotation to the
+    // interaction point and the reference's delay timers must land first.
 }
 
 /// Client tick HEAD, before the movement writer.
