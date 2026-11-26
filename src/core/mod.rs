@@ -1,4 +1,5 @@
 pub mod anti_fireball_runtime;
+pub mod bed_breaker_runtime;
 pub mod automation;
 pub mod combat_extra;
 pub mod combat_runtime;

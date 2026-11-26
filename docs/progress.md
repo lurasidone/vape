@@ -2774,7 +2774,11 @@ Ported the reference's head-half `BedTargetPosition`, `BedTargetRenderState`
 `WorldView` queries (bed block and facing, replaceable cover positions, the
 player-relative destroy progress per hotbar slot, the hotbar stacks) and
 returns the cover with the best progress, or `None` when the bed is exposed.
-The module's Normal/Hypixel mode definition is included. `cargo check
---offline` passes. The host scan, `Game::pick` mouse-over claim, break
+The module's Normal/Hypixel mode definition is included. The runtime state
+lives in `src/core/bed_breaker_runtime.rs`: it keeps the target list across
+ticks, animates visibility, selects the last target inside the reticle,
+resolves/finishes the Hypixel cover and exposes the block, tool slot and
+server-rotation target. `cargo check --offline` passes. The host scan, the
+reticle projection, the `Game::pick` mouse-over claim, the break
 rotation/movement fix and the indicator renderer are the next batch; the
 module is not registered yet.
