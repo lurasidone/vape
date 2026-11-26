@@ -5,7 +5,7 @@ use super::super::modules::world::bed_breaker::{
     BedBreakPhase, BedCoverTargetSelector, BedTargetPosition, BedTargetRenderState, Mode, WorldView,
 };
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct BedBreaker {
     targets: Vec<BedTargetRenderState>,
     selected: Option<usize>,

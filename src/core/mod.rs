@@ -130,6 +130,7 @@ pub struct Runtime {
     wtap: super::modules::combat::wtap::WTap,
     sprint: super::modules::combat::sprint::Sprint,
     anti_afk: super::modules::world::anti_afk::AntiAfk,
+    bed_breaker: bed_breaker_runtime::BedBreaker,
     speed: super::modules::blatant::speed::State,
     long_jump: super::modules::blatant::long_jump::State,
     anti_fall: super::modules::blatant::anti_fall::State,
@@ -382,6 +383,7 @@ impl Default for Runtime {
             .chain(super::modules::legit::definitions())
             .chain(super::modules::combat::wtap::definitions())
             .chain(super::modules::world::anti_afk::definitions())
+            .chain(super::modules::world::bed_breaker::definitions())
             .chain(super::modules::movement::definitions())
         {
             settings.define(definition).unwrap();
@@ -565,6 +567,7 @@ impl Default for Runtime {
             combat_extra: Default::default(),
             sprint: Default::default(),
             anti_afk: Default::default(),
+            bed_breaker: Default::default(),
             speed: Default::default(),
             long_jump: Default::default(),
             anti_fall: Default::default(),
@@ -683,6 +686,7 @@ impl Runtime {
                 ModuleId::WTap => self.wtap.reset(),
                 ModuleId::Sprint => self.sprint.reset(),
                 ModuleId::AntiAfk => self.anti_afk.reset(),
+                ModuleId::BedBreaker => self.bed_breaker.reset(),
                 ModuleId::Speed => self.speed.reset(),
                 ModuleId::LongJump => self.long_jump.reset(),
                 ModuleId::AntiFall => self.anti_fall.reset(),
@@ -2475,6 +2479,7 @@ impl Runtime {
                 | ModuleId::HitSwap
                 | ModuleId::AutoMace
                 | ModuleId::ShieldBreaker
+                | ModuleId::BedBreaker
                 | ModuleId::AntiFireball => continue,
             };
             use super::ui::hud::Content;

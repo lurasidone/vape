@@ -2921,3 +2921,11 @@ hide/restore). The HUD detail GUI-editor half is stale: its fixed click
 coordinates no longer match the current layout, and the control socket has
 no `rshift`; the scenario now seeds the GUI bind to LeftShift and uses
 `shift`.
+
+## 2026-11-26: BedBreaker registration
+
+Registered `world.bed-breaker` in the module table, added its
+`bed_breaker_runtime::BedBreaker` field with the disable reset, and its
+Normal/Hypixel mode definition. `cargo check --offline` passes. The host
+scan, reticle projection, `Game::pick` claim, break rotation/movement and
+indicator renderer are the next batch.

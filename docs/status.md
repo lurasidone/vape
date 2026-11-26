@@ -73,7 +73,11 @@ some hook points moved. Current full build: `native-f1bb66f-76d3241d8036`.
   `#[replaceable]`; game-crate thread-locals are not visible), and the 2D
   overlay/on-top and MotionBlur present passes (camera/renderer state lives
   in the library/render crate).
-- **Not started modules** (BedBreaker, CrystalAura, AutoAnchor, Block-In, the
+- **BedBreaker** is registered (`world.bed-breaker`) with its core types,
+  cover selector, runtime target list and mode setting; the host scan,
+  reticle projection, `Game::pick` claim, break rotation/movement and
+  indicator renderer remain.
+- **Not started modules** (CrystalAura, AutoAnchor, Block-In, the
   InventoryManager filter-rule editor, translations/fonts) can resume: the
   exact reference `3d600a48` / `4.21.43` is cloned at the sibling
   `../Vape-v4` (from `RSSeeker/Vape-v4`), outside this repository and never
