@@ -668,6 +668,14 @@ pub(super) fn pick(game: &Game<'_>) -> core::ops::ControlFlow<Option<(usize, f64
         return ControlFlow::Continue(());
     }
     let client = crate::game::vape_rs::core::client().clone();
+    if crate::game::vape_rs::core::try_with_client(&client, |runtime| {
+        runtime.bed_breaker_target()
+    })
+    .flatten()
+    .is_some()
+    {
+        return ControlFlow::Break(None);
+    }
     let player = reach_player(game);
     match crate::game::vape_rs::core::try_with_client(&client, |runtime| runtime.pick_range(player))
         .flatten()

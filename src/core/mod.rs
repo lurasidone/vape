@@ -639,6 +639,9 @@ impl Runtime {
         let inside = self.bed_breaker.inside();
         self.bed_breaker.tick(world, &beds, &inside, mode, now_ms)
     }
+    pub fn bed_breaker_target(&self) -> Option<bed_breaker_runtime::Target> {
+        self.bed_breaker.target()
+    }
     pub fn set_enabled(&mut self, module: ModuleId, enabled: bool) {
         if module == ModuleId::Panic {
             if enabled {

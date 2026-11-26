@@ -2950,3 +2950,11 @@ destroy progress for the Hypixel cover). `cargo check --offline` and the
 native build (`native-f1bb66f-b511bed93f59`) pass. The `Game::pick` claim,
 the break rotation/movement fix and the indicator renderer remain; the
 Hypixel cover's per-slot tool speed comes with the pick/break batch.
+
+## 2026-11-26: BedBreaker mouse-over claim
+
+When the selected bed/cover is within 4.5 blocks of the eye, the block
+crosshair returns that block (top face), and the entity pick is suppressed
+for the target. `cargo check --offline` and the native build
+(`native-f1bb66f-8bfb7219b4ae`) pass. The break rotation/movement fix and
+the indicator renderer remain.

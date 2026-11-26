@@ -158,6 +158,28 @@ fn inventory(game: &Game<'_>) -> Inventory {
 /// within 3, a miss past it). LAN guests count within the host's guest pick.
 fn crosshair_block(game: &Game<'_>) -> Option<Hit> {
     let (eye, dir) = game.aim()?;
+    let client = crate::game::vape_rs::core::client().clone();
+    if let Some(target) = crate::game::vape_rs::core::try_with_client(&client, |runtime| {
+        runtime.bed_breaker_target()
+    })
+    .flatten()
+    {
+        let center = [
+            f64::from(target.block[0]) + 0.5,
+            f64::from(target.block[1]) + 0.5,
+            f64::from(target.block[2]) + 0.5,
+        ];
+        let distance = (0..3)
+            .map(|i| (center[i] - eye[i]).powi(2))
+            .sum::<f64>()
+            .sqrt();
+        if distance < 4.5 {
+            return Some(Hit {
+                pos: target.block,
+                side: 1,
+            });
+        }
+    }
     let reach = game.reach();
     let hit = game.clip_ray(eye, dir, reach)?;
     let distance = (0..3)

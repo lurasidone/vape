@@ -13,6 +13,8 @@ pub struct BedBreaker {
     last_progress: Option<usize>,
     /// The cover block the Hypixel server rotation points at.
     server_rotation: Option<[i32; 3]>,
+    /// The target the host acts on, from the last tick.
+    target: Option<Target>,
 }
 
 /// What the host acts on this tick.
@@ -34,6 +36,7 @@ impl BedBreaker {
         self.selected = None;
         self.last_progress = None;
         self.server_rotation = None;
+        self.target = None;
     }
 
     /// The host's scheduled scan: replace the target list with the beds found,
@@ -67,6 +70,9 @@ impl BedBreaker {
         for (state, yes) in self.targets.iter_mut().zip(inside) {
             state.inside_reticle = *yes;
         }
+    }
+    pub fn target(&self) -> Option<Target> {
+        self.target
     }
 
     /// The reference's `onRender3D`/`onBedBreakerUpdate` pair: refresh the
@@ -132,12 +138,14 @@ impl BedBreaker {
         self.last_progress = Some(index);
         self.server_rotation =
             (mode == Mode::Hypixel && phase == BedBreakPhase::Cover).then_some(block);
-        Some(Target {
+        let target = Target {
             bed: state.position.block(),
             block,
             tool_slot,
             phase,
-        })
+        };
+        self.target = Some(target);
+        Some(target)
     }
 
     pub fn selected(&self) -> Option<usize> {
