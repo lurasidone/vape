@@ -392,6 +392,36 @@ pub fn damage_efficiency(raw_damage: f32, diameter: f32) -> f32 {
     raw_damage / (8.0 * diameter + 1.0)
 }
 
+/// A block-aligned box, as `AxisAlignedBB` in the reference.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Aabb {
+    pub min: [f64; 3],
+    pub max: [f64; 3],
+}
+
+impl Aabb {
+    pub fn intersects(&self, other: &Aabb) -> bool {
+        self.min[0] < other.max[0]
+            && self.max[0] > other.min[0]
+            && self.min[1] < other.max[1]
+            && self.max[1] > other.min[1]
+            && self.min[2] < other.max[2]
+            && self.max[2] > other.min[2]
+    }
+}
+
+/// The reference's `crystalBoundingBox`: the 1x2x1 space above the base.
+pub fn crystal_box(base: [i32; 3]) -> Aabb {
+    Aabb {
+        min: [f64::from(base[0]), f64::from(base[1]) + 1.0, f64::from(base[2])],
+        max: [
+            f64::from(base[0]) + 1.0,
+            f64::from(base[1]) + 3.0,
+            f64::from(base[2]) + 1.0,
+        ],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -522,5 +552,20 @@ mod tests {
         assert!((damage_efficiency(maximum, diameter) - 1.0).abs() < 1e-6);
         assert!(damage_efficiency(maximum / 2.0, diameter) < 1.0);
         assert_eq!(damage_efficiency(0.0, diameter), 0.0);
+    }
+
+    #[test]
+    fn the_crystal_box_sits_above_its_base() {
+        let crystal = crystal_box([2, 5, -1]);
+        assert_eq!(crystal.min, [2.0, 6.0, -1.0]);
+        assert_eq!(crystal.max, [3.0, 8.0, 0.0]);
+        assert!(crystal.intersects(&Aabb {
+            min: [2.5, 6.5, -0.5],
+            max: [2.6, 6.6, -0.4],
+        }));
+        assert!(!crystal.intersects(&Aabb {
+            min: [2.5, 8.0, -0.5],
+            max: [2.6, 9.0, -0.4],
+        }));
     }
 }
