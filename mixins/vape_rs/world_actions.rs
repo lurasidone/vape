@@ -12,6 +12,7 @@ use crate::game::vape_rs::modules::movement::scaffold_bridge::{Hit, Inventory, S
 use crate::game::vape_rs::modules::movement::{inv_walk, scaffold, wind_charge};
 use crate::game::vape_rs::modules::combat::crystal_aura;
 use crate::game::vape_rs::modules::combat::rotation;
+use crate::game::vape_rs::modules::utility::auto_anchor;
 use horizon_core::geometry::Vec3;
 use winit::keyboard::KeyCode;
 
@@ -22,6 +23,8 @@ thread_local! {
     static TOTEM_HOLD: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
     /// BedBreaker's scheduled action: the reference scans every 50 ticks.
     static BED_SCAN_TICKS: core::cell::Cell<u64> = const { core::cell::Cell::new(0) };
+    /// AutoAnchor's On place right-click edge.
+    static AUTO_ANCHOR_RIGHT: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
 }
 
 /// Keys physically held, through the key mapping (`KeyMapping.isDown` of
@@ -665,6 +668,340 @@ fn crystal_aura_tick(game: &mut Game<'_>) {
     }
 }
 
+/// The hotbar slot whose item id ends with `name`.
+fn auto_anchor_hotbar(game: &Game<'_>, name: &str) -> i32 {
+    game.inventory
+        .iter()
+        .take(9)
+        .position(|stack| {
+            stack
+                .as_ref()
+                .is_some_and(|stack| stack.item.ends_with(name))
+        })
+        .map_or(-1, |slot| slot as i32)
+}
+
+fn auto_anchor_count(game: &Game<'_>, slot: i32) -> i32 {
+    usize::try_from(slot)
+        .ok()
+        .and_then(|slot| game.inventory.get(slot))
+        .and_then(Option::as_ref)
+        .map_or(0, |stack| stack.count as i32)
+}
+
+/// The first whitelisted hotbar slot.
+fn auto_anchor_explosion_slot(game: &Game<'_>, items: &[String]) -> i32 {
+    (0..9)
+        .find(|slot| {
+            let held = crate::game::vape_combat::item_at(game, *slot);
+            crate::game::vape_rs::inventory::item_limit::matches(items, &held)
+        })
+        .map_or(-1, |slot| slot as i32)
+}
+
+fn auto_anchor_is_anchor(game: &Game<'_>, pos: [i32; 3]) -> bool {
+    game.res
+        .facts()
+        .get(game.world.block(pos[0], pos[1], pos[2]))
+        .name
+        .contains("respawn_anchor")
+}
+
+/// The reference's `findBestAnchorFace`: the visible anchor face point with
+/// the smallest angular distance from the view.
+fn auto_anchor_face(
+    game: &Game<'_>,
+    eye: [f64; 3],
+    view: (f32, f32),
+    anchor: [i32; 3],
+    obstruction: Option<[i32; 3]>,
+) -> Option<[f64; 3]> {
+    let (x, y, z) = (
+        f64::from(anchor[0]),
+        f64::from(anchor[1]),
+        f64::from(anchor[2]),
+    );
+    let points = [
+        [x + 0.5, y + 1.0, z + 0.5],
+        [x + 0.5, y, z + 0.5],
+        [x, y + 0.5, z + 0.5],
+        [x + 1.0, y + 0.5, z + 0.5],
+        [x + 0.5, y + 0.5, z],
+        [x + 0.5, y + 0.5, z + 1.0],
+        [x + 0.25, y + 1.0, z + 0.5],
+        [x + 0.75, y + 1.0, z + 0.5],
+        [x, y + 0.25, z + 0.5],
+        [x + 1.0, y + 0.75, z + 0.5],
+        [x + 0.5, y + 0.25, z],
+        [x + 0.5, y + 0.75, z + 1.0],
+        [x + 0.25, y, z + 0.5],
+        [x + 0.75, y, z + 0.5],
+    ];
+    let obstruction = obstruction.map(auto_anchor::block_bounds);
+    let mut best: Option<(f64, [f64; 3])> = None;
+    for point in points {
+        if let Some(bounds) = obstruction
+            && auto_anchor::segment_hits_box(eye, point, bounds)
+        {
+            continue;
+        }
+        let (dx, dy, dz) = (point[0] - eye[0], point[1] - eye[1], point[2] - eye[2]);
+        let distance = (dx * dx + dy * dy + dz * dz).sqrt();
+        if distance <= 1.0e-4 {
+            continue;
+        }
+        let direction = [dx / distance, dy / distance, dz / distance];
+        let Some(hit) = game.clip_ray(eye, direction, distance + 0.01) else {
+            continue;
+        };
+        if hit.pos != anchor {
+            continue;
+        }
+        let target = rotation::look_at(eye, point);
+        let yaw = f64::from(rotation::wrap(target.0 - view.0));
+        let pitch = f64::from(target.1 - view.1);
+        let angle = (yaw * yaw + pitch * pitch).sqrt();
+        if best.is_none_or(|(current, _)| angle < current) {
+            best = Some((angle, point));
+        }
+    }
+    best.map(|(_, point)| point)
+}
+
+/// The reference's `findShieldCandidate`: a glowstone block on the line
+/// between the player and the anchor that partly covers the player.
+fn auto_anchor_shield(
+    game: &Game<'_>,
+    anchor: [i32; 3],
+    eye: [f64; 3],
+    view: (f32, f32),
+    player_box: auto_anchor::Bounds,
+    feet: [f64; 3],
+) -> Option<auto_anchor::ShieldCandidate> {
+    let aim = auto_anchor_face(game, eye, view, anchor, None)
+        .unwrap_or_else(|| auto_anchor::center(anchor));
+    let (dx, dy, dz) = (aim[0] - feet[0], aim[1] - feet[1], aim[2] - feet[2]);
+    let distance = (dx * dx + dy * dy + dz * dz).sqrt();
+    if distance < 1.5 {
+        return None;
+    }
+    let direction = [dx / distance, dy / distance, dz / distance];
+    let mut candidates: Vec<[i32; 3]> = Vec::new();
+    let mut offset = 0.8;
+    while offset < distance - 0.5 {
+        let block = [
+            (feet[0] + direction[0] * offset).floor() as i32,
+            (feet[1] + direction[1] * offset).floor() as i32,
+            (feet[2] + direction[2] * offset).floor() as i32,
+        ];
+        if block != anchor && !candidates.contains(&block) {
+            candidates.push(block);
+        }
+        offset += 0.4;
+    }
+    let facts = game.res.facts();
+    let replaceable = |block: [i32; 3]| {
+        facts
+            .get(game.world.block(block[0], block[1], block[2]))
+            .replaceable
+    };
+    let support = |block: [i32; 3]| -> Option<([i32; 3], u8)> {
+        for (offset, facing) in [
+            ([0, -1, 0], 0u8),
+            ([0, 1, 0], 1),
+            ([-1, 0, 0], 4),
+            ([1, 0, 0], 5),
+            ([0, 0, -1], 2),
+            ([0, 0, 1], 3),
+        ] {
+            let at = [
+                block[0] + offset[0],
+                block[1] + offset[1],
+                block[2] + offset[2],
+            ];
+            let state = facts.get(game.world.block(at[0], at[1], at[2]));
+            if state.full_collision && !state.replaceable {
+                return Some((at, facing));
+            }
+        }
+        None
+    };
+    let mut best: Option<(f32, auto_anchor::ShieldCandidate)> = None;
+    for block in candidates {
+        if !replaceable(block) {
+            continue;
+        }
+        let bounds = auto_anchor::block_bounds(block);
+        if bounds.min[0] < player_box.max[0]
+            && bounds.max[0] > player_box.min[0]
+            && bounds.min[1] < player_box.max[1]
+            && bounds.max[1] > player_box.min[1]
+            && bounds.min[2] < player_box.max[2]
+            && bounds.max[2] > player_box.min[2]
+        {
+            continue;
+        }
+        let Some((support, facing)) = support(block) else {
+            continue;
+        };
+        if auto_anchor::anchor_fully_visible(eye, anchor, block) {
+            continue;
+        }
+        let Some(visible) = auto_anchor_face(game, eye, view, anchor, Some(block)) else {
+            continue;
+        };
+        let ratio = auto_anchor::visibility_ratio(visible, block, player_box);
+        if ratio >= 0.15 {
+            return Some(auto_anchor::ShieldCandidate {
+                block,
+                support,
+                facing,
+            });
+        }
+        if best.is_none_or(|(best, _)| ratio > best) {
+            best = Some((
+                ratio,
+                auto_anchor::ShieldCandidate {
+                    block,
+                    support,
+                    facing,
+                },
+            ));
+        }
+    }
+    best.map(|(_, candidate)| candidate)
+}
+
+/// AutoAnchor's host: the macro ledger's world inputs, the shared rotation
+/// and the slot/right-click actions.
+fn auto_anchor_tick(game: &mut Game<'_>) {
+    let client = crate::game::vape_rs::core::client().clone();
+    if !with_client(&client, |runtime| runtime.enabled(ModuleId::AutoAnchor)) {
+        let restore = with_client(&client, |runtime| runtime.auto_anchor_release());
+        if let Some(slot) = restore
+            .and_then(|slot| usize::try_from(slot).ok())
+            .filter(|slot| *slot < 9)
+        {
+            game.selected = slot;
+        }
+        AUTO_ANCHOR_RIGHT.with(|last| last.set(game.mouse_held()[1]));
+        return;
+    }
+    let options = with_client(&client, |runtime| {
+        auto_anchor::Options::read(runtime.settings())
+    });
+    let items = with_client(&client, |runtime| {
+        auto_anchor::explosion_items(runtime.settings())
+    });
+    let Some(player) = game.player.as_ref() else {
+        return;
+    };
+    let (px, py, pz) = (player.position.x, player.position.y, player.position.z);
+    let eye = [px, py + f64::from(player.dimensions.eye_height), pz];
+    let view = (game.yaw, game.pitch);
+    let can_act = matches!(game.screen, crate::game::Screen::Playing)
+        && player.health.health() > 0.0;
+    let held_slot = game.selected as i32;
+    let anchor_slot = auto_anchor_hotbar(game, "respawn_anchor");
+    let glowstone_slot = auto_anchor_hotbar(game, "glowstone");
+    let glowstone_count = auto_anchor_count(game, glowstone_slot);
+    let explosion_slot = auto_anchor_explosion_slot(game, &items);
+    let bounds = player.bounds();
+    let (bounds_min, bounds_max) = (bounds.min_position(), bounds.max_position());
+    let player_box = auto_anchor::Bounds {
+        min: [bounds_min.x, bounds_min.y, bounds_min.z],
+        max: [bounds_max.x, bounds_max.y, bounds_max.z],
+    };
+    let (anchor_pos, shield, state) = with_client(&client, |runtime| {
+        let ledger = runtime.auto_anchor();
+        (ledger.anchor_pos, ledger.shield, ledger.state)
+    });
+    let managed = with_client(&client, |runtime| runtime.managed_view(view));
+    let direction = rotation::direction(managed.0, managed.1);
+    let hit = game.clip_ray(eye, direction, 4.5);
+    let crosshair = hit.map(|hit| auto_anchor::HitTarget {
+        pos: hit.pos,
+        facing: crystal_aura::facing_index(hit.face),
+    });
+    let crosshair_anchor = hit.is_some_and(|hit| auto_anchor_is_anchor(game, hit.pos));
+    let anchor_present = anchor_pos.is_some_and(|pos| auto_anchor_is_anchor(game, pos));
+    let anchor_face = if anchor_present {
+        anchor_pos.and_then(|anchor| {
+            auto_anchor_face(game, eye, view, anchor, shield.map(|shield| shield.block))
+        })
+    } else {
+        None
+    };
+    let shield_candidate = if options.safe_anchor && shield.is_none() && anchor_present {
+        anchor_pos.and_then(|anchor| {
+            auto_anchor_shield(game, anchor, eye, view, player_box, [px, py, pz])
+        })
+    } else {
+        shield
+    };
+    let shield_clear = shield_candidate.is_some_and(|candidate| {
+        !game
+            .res
+            .facts()
+            .get(
+                game.world
+                    .block(candidate.block[0], candidate.block[1], candidate.block[2]),
+            )
+            .replaceable
+    });
+    let tick = auto_anchor::Tick {
+        now_ms: with_client(&client, |runtime| runtime.now_ms()),
+        eye,
+        view,
+        held_slot,
+        anchor_slot,
+        glowstone_slot,
+        glowstone_count,
+        explosion_slot,
+        crosshair,
+        crosshair_anchor,
+        anchor_present,
+        anchor_face,
+        shield: shield_candidate,
+        shield_clear,
+        can_act,
+    };
+    let right = game.mouse_held()[1];
+    let rising = right && !AUTO_ANCHOR_RIGHT.with(|last| last.get());
+    AUTO_ANCHOR_RIGHT.with(|last| last.set(right));
+    if rising && options.mode == auto_anchor::Mode::OnPlace && state == auto_anchor::State::Idle {
+        with_client(&client, |runtime| runtime.auto_anchor_start_on_place(&tick));
+    }
+    let actions = with_client(&client, |runtime| runtime.auto_anchor_tick(&tick));
+    if let Some(slot) = actions
+        .select
+        .and_then(|slot| usize::try_from(slot).ok())
+        .filter(|slot| *slot < 9)
+    {
+        game.selected = slot;
+    }
+    if let Some(slot) = actions
+        .restore
+        .and_then(|slot| usize::try_from(slot).ok())
+        .filter(|slot| *slot < 9)
+    {
+        game.selected = slot;
+    }
+    if actions.uses > 0 && can_act {
+        let camera = (game.yaw, game.pitch);
+        (game.yaw, game.pitch) = managed;
+        for _ in 0..actions.uses {
+            if game.remote.is_some() {
+                game.remote_use(mod_api::InteractionAttempt::Press);
+            } else if game.using.is_none() {
+                let _ = game.use_with_hand();
+                game.use_delay = 4;
+            }
+        }
+        (game.yaw, game.pitch) = camera;
+    }
+}
+
 /// Client tick HEAD, before the movement writer.
 pub(crate) fn tick(game: &mut Game<'_>) {
     if game.player.is_none() {
@@ -689,6 +1026,7 @@ pub(crate) fn tick(game: &mut Game<'_>) {
         )
     });
     crystal_aura_tick(game);
+    auto_anchor_tick(game);
     // AutoTotem's silent open holds the movement keys (and attack/use) from
     // the open until one "Silent move delay" after its close.
     let totem_hold = with_client(&client, |runtime| {

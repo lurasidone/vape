@@ -3100,3 +3100,22 @@ SDK build (`native-f1bb66f-8e8e51f1eb70`) compiles; the new
 (floor, wall, obsidian, netherite armor, a cow target): the module starts
 disabled, enables through its bind, places, attacks, kills the cow and the
 player survives the blast.
+
+## 2026-11-26: AutoAnchor
+
+`utility.auto-anchor` ports the reference's On bind/On place macro: find the
+anchor and glowstone slots, place the anchor on the crosshair block, charge
+it with glowstone, swap to the whitelisted explosion item (or back to the
+anchor) and detonate it. The optional safe anchor places a glowstone cover
+on the line to the anchor (`visibility_ratio`/`anchor_fully_visible`), the
+double anchor right-clicks twice and recharges, the aim assist drives the
+shared rotation (silent managed or visible fixed under
+`Claimant::AutoAnchor`, priority 8) at the base/anchor face points, and the
+reference's retries and random Delay timer gate each step. The On place mode
+starts from a fresh right-click and waits for the anchor.
+
+`cargo test --offline --lib` passes 499 tests (8 auto_anchor); the native
+SDK build (`native-f1bb66f-692e58ab05e8`) compiles; the new
+`tools/auto_anchor_scenario.py` passes **8/8** in a fresh isolated world:
+the module starts disabled, enables through its bind, places the anchor,
+charges it, detonates it and disables, and the player survives.

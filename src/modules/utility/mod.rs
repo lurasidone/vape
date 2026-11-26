@@ -1,4 +1,5 @@
 pub mod armor_switch;
+pub mod auto_anchor;
 pub mod auto_armor;
 pub mod auto_fish;
 pub mod auto_heal;

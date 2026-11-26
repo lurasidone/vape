@@ -82,6 +82,9 @@ impl Runtime {
         if id.starts_with("combat.crystal-aura.") {
             self.crystal_aura.reset();
         }
+        if id.starts_with("utility.auto-anchor.") {
+            self.auto_anchor.reset();
+        }
         let c = &mut self.combat;
         if id.starts_with("combat.kill-aura.") {
             c.kill_aura.reset();
@@ -100,6 +103,7 @@ impl Runtime {
     /// managed rotation.
     pub(super) fn combat_session_reset(&mut self) {
         self.crystal_aura.reset();
+        self.auto_anchor.reset();
         let c = &mut self.combat;
         c.kill_aura.reset();
         c.keep_sprint.reset();

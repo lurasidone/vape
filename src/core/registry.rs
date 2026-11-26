@@ -64,6 +64,7 @@ registry! {
     FastPlace => "world.fast-place", "FastPlace", "World", None, [];
     BedBreaker => "world.bed-breaker", "BedBreaker", "World", None, [];
     CrystalAura => "combat.crystal-aura", "CrystalAura", "Combat", None, [];
+    AutoAnchor => "utility.auto-anchor", "AutoAnchor", "Utility", None, [];
     Fullbright => "render.fullbright", "Fullbright", "Render", None, [];
     ClearWater => "render.clear-water", "Clear Water", "Render", None, [];
     AutoFish => "utility.auto-fish", "AutoFish", "World", None, [];

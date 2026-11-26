@@ -89,7 +89,12 @@ some hook points moved. Current full build: `native-f1bb66f-76d3241d8036`.
   to the interaction point and the reference's Delay/Action delay timers
   driving the Auto place -> break -> attack loop; `tools/crystal_aura_scenario.py`
   passes **7/7**. The Manual submodule and auto-obsidian placement remain.
-- **Not started modules** (AutoAnchor, Block-In, the
+- **AutoAnchor** is registered (`utility.auto-anchor`) with the On bind/On
+  place macro (anchor and glowstone slots, placement, glowstone charge,
+  explosion-item swap and detonation), the safe-anchor glowstone cover,
+  double anchor, the shared rotation and the reference retries/Delay timer;
+  `tools/auto_anchor_scenario.py` passes **8/8** in a fresh isolated world.
+- **Not started modules** (Block-In, the
   InventoryManager filter-rule editor, translations/fonts) can resume: the
   exact reference `3d600a48` / `4.21.43` is cloned at the sibling
   `../Vape-v4` (from `RSSeeker/Vape-v4`), outside this repository and never
@@ -104,10 +109,10 @@ have rows:
 - OmniSprint, CPSMod and SelfDestruct are not-applicable-reviewed: their reference bodies are empty, and SelfDestruct's unload is removed injection infrastructure.
 - Anti-FML is not-applicable-reviewed: Horizon sends no Forge handshake to cancel.
 
-Modules validated in a real game (84 module/client rows):
+Modules validated in a real game (85 module/client rows):
 - **Combat:** AutoClicker, RightClicker, TriggerBot, JumpReset, WTap, Sprint, KeepSprint, Velocity, HitBoxes, BlockHit, HitSelect, HitSwap, ShieldBreaker, TargetFilter, SilentAura clicker, CrystalAura (Auto loop).
 - **Movement:** NoSlowdown, Speed, Fly, NoFall, InvWalk, Timer, SafeWalk, NoItemRelease, WindCharge, Freecam.
-- **World / utility:** Anti-AFK, AutoFish, FastPlace, BackTrack, KnockbackDelay, Panic, AutoPearl, PearlCatch, AutoTool.
+- **World / utility:** Anti-AFK, AutoFish, FastPlace, BackTrack, KnockbackDelay, Panic, AutoPearl, PearlCatch, AutoTool, AutoAnchor.
 - **Inventory:** Refill, Throwpot, ThrowDebuff, AutoHeal, AutoTotem, ChestSteal, InventoryManager, InvCleaner, AutoHotbar, ArmorSwitch.
 - **Render:** Fullbright, Clear Water, Time Changer, Weather, AntiDebuff, ItemESP, NoHurtCam, NoClickDelay, NoJumpDelay, Inventory Blur, ESP, Tracers, NameTags, Search, SpawnerFinder, StorageESP, Trajectories, Projectiles, Arrows, Health, Explosions, Indicators, BedPlates, Block Overlay, PropHunt, MurdererFinder.
 - **HUD / client:** Armor Status, Potion Status, Coords, FPS, Compass, Clock, Keystrokes, Reach Display, Target Info, local toggle notifications, the GUI and config settings modules.
@@ -124,10 +129,10 @@ Implemented core (logic and tests, host path incomplete): HitFlick, the shared c
 the typed setting editors.
 
 Not started: CrystalAura's Manual submodule and auto-obsidian placement,
-AutoAnchor, AutoLadder, BedBreaker, Block-In, Clutch, MLG, MotionBlur (it
-has hook targets now, see decisions.md), the InventoryManager filter-rule
-editor panel, and the translations/fonts row (the HUD still uses the host
-bitmap font; the GUI uses Geist).
+AutoLadder, BedBreaker, Block-In, Clutch, MLG, MotionBlur (it has hook
+targets now, see decisions.md), the InventoryManager filter-rule editor
+panel, and the translations/fonts row (the HUD still uses the host bitmap
+font; the GUI uses Geist).
 
 ## Blocked on the host
 
