@@ -422,6 +422,32 @@ pub fn crystal_box(base: [i32; 3]) -> Aabb {
     }
 }
 
+/// The reference's two-pass scan order: the first pass only considers the
+/// half-plane toward the target (when it is farther than 1.75 blocks), the
+/// second considers every offset. The centre is skipped.
+pub fn search_offsets(radius: i32, target_close: bool, target_offset: [f64; 2]) -> Vec<[i32; 2]> {
+    let mut offsets = Vec::with_capacity(((radius * 2 + 1).pow(2) - 1).max(0) as usize * 2);
+    for pass in 0..2 {
+        let only_toward = pass == 0 && !target_close;
+        for x in -radius..=radius {
+            for z in -radius..=radius {
+                if x == 0 && z == 0 {
+                    continue;
+                }
+                if only_toward {
+                    let toward =
+                        target_offset[0] * f64::from(x) + target_offset[1] * f64::from(z);
+                    if toward < 0.0 {
+                        continue;
+                    }
+                }
+                offsets.push([x, z]);
+            }
+        }
+    }
+    offsets
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -567,5 +593,20 @@ mod tests {
             min: [2.5, 8.0, -0.5],
             max: [2.6, 9.0, -0.4],
         }));
+    }
+
+    #[test]
+    fn a_far_target_scans_toward_it_first_and_skips_the_centre() {
+        let offsets = search_offsets(1, false, [1.0, 0.0]);
+        // 8 offsets per pass, the centre skipped; the first pass keeps only
+        // the 5 with a non-negative x.
+        assert_eq!(offsets.len(), 13);
+        assert!(!offsets.contains(&[0, 0]));
+        assert!(offsets[..5].iter().all(|offset| offset[0] >= 0));
+        assert!(offsets[5..].iter().any(|offset| offset[0] < 0));
+        // A close target applies the filter to both passes.
+        let close = search_offsets(1, true, [1.0, 0.0]);
+        assert_eq!(close.len(), 16);
+        assert!(close[..8].iter().any(|offset| offset[0] < 0));
     }
 }
