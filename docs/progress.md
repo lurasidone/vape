@@ -2724,5 +2724,8 @@ because `playing(game)` requires `game.focused` and the control-socket /
 offscreen launch never focuses the window. Parkour and the other
 input-delay modules gated by `playing` therefore cannot be exercised through
 this harness. Flipping `edge_ahead`'s near check to `!near && far` also did
-not change the result and was reverted. The visible focused-window
-`NativeSession` path is required for these modules; no module code changed.
+not change the result and was reverted. Tried focusing a visible launch with
+`xdotool windowactivate` on `DISPLAY=:0`; no visible window was found
+(`xdotool search --onlyvisible` returned nothing), so the focus gate cannot be
+satisfied from this session. The visible focused-window `NativeSession` path
+is required for these modules; no module code changed.
