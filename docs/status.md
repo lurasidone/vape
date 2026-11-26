@@ -1,6 +1,6 @@
 # Current implementation handoff
 
-Updated 2026-11-01 on main, after the worst-case load runs, the BackTrack
+Updated 2026-11-01 on main (current SDK state: 2026-11-26; see below), after the worst-case load runs, the BackTrack
 release-time and TargetInfo preview fixes (bundle `692a0f79`) and the wind-down
 merge of the round 5/6 worker branches (progress.md 2026-11-01).
 The round 2–4 workers (combat-a, combat-b, inventory, render,
@@ -26,6 +26,36 @@ moved 19 of them on 2026-10-31, and most of the remaining not-started rows
 are the 47 classes of the inventory-filter GUI editor, which is not ported. `validated` always means a
 passing fresh-home host scenario with evidence in docs/evidence;
 `integrated` means hooked and running in the host without a full scenario.
+
+## Current SDK candidate (2026-11-26)
+
+The ledger above is the 2026-11-01 state. The signed Nov 22 SDK
+(`f1bb66f353cf67f2aa4665293fc75c8d91186fc7`, launcher `0.2.108`) split the
+client library out of the game crate, so the native bundle was rebuilt and
+some hook points moved. Current full build: `native-f1bb66f-0b8365d4fc48`.
+
+- **NoFall** is applied at `Game::send`: a `HEAD` on `remote_send_state` sets
+  the claim, and a `MODIFY_ARG` on `self.send_body(packet)` rewrites the
+  position packet's on-ground bit (and the managed rotation). Normal and
+  AntiCheat were validated on LAN host/guest falls.
+- **NoSlowdown** is an `AFTER_CALL` on `self.sync_player_body` in
+  `tick_local_player_body`; validated on an integrated bow-draw walk
+  (0.81 -> 4.06 blocks in 20 ticks).
+- **AutoHeal** pre/post motion are a `HEAD` and an `AFTER_CALL` on
+  `remote_send_state`; Replace was validated on LAN (20 -> 10 damage, potion
+  consumed, health 14, pitch unchanged).
+- **Timer** uses `current-timer-steps`; its 2x speed was measured on the
+  current SDK build.
+- **Target Info** counts a locally thrown heal potion through the existing
+  `use_potion_item` hook; the old `launch_thrown` target is gone.
+- **Blocked by the crate split:** Fly, Speed, LongJump, InvWalk and SafeWalk
+  (the movement tick/`move_self` live in `horizon_client_lib`, no
+  `#[replaceable]`; game-crate thread-locals are not visible), and the 2D
+  overlay/on-top and MotionBlur present passes (camera/renderer state lives
+  in the library/render crate).
+- **Not started modules** (BedBreaker, CrystalAura, AutoAnchor, Block-In, the
+  InventoryManager filter-rule editor, translations/fonts) need the
+  `../Vape-v4` reference checkout, which is absent from this workspace.
 
 Scope (user decision, 2026-11-01): whether the reference's ModManager registers a
 module is not a scope criterion, and the interface is a design rebuilt from the
