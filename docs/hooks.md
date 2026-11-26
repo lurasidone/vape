@@ -25,11 +25,13 @@ authoritative.
   (a `RETURN` on the delegating function double-borrows `self`).
 - `timer-advance` is replaced by `current-timer-steps`
   (`MODIFY_VARIABLE` on `Game<'_>::client_tick_steps`).
+- `target-info-pot-launch` is folded into `target-info-pot-use`: the
+  `use_potion_item` hook calls `target_heal_joined` for a splash or lingering
+  potion and `target_heal_used` for a drink.
 - Not applied on this SDK: `fly-move`, `inv-walk-keys`, `safe-walk-edge`,
   `on-top-hook` and `overlay-hook` (library-crate split; `move_self` is not
-  replaceable), `target-info-pot-launch` (the target is gone), and the old
-  `send-state-rotation` (folded into `send-state-ground`). See
-  `docs/decisions.md` (2026-11-25).
+  replaceable), and the old `send-state-rotation` (folded into
+  `send-state-ground`). See `docs/decisions.md` (2026-11-25).
 
 ## Hooks
 
