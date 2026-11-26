@@ -2755,7 +2755,9 @@ input writer now applies `anti_fireball_held_up` for Stop movement, and
 `movement_input_locked` includes `anti_fireball_locked`.
 
 The crosshair ray now also stops at a nearer living body (`mob_hit_within`),
-so a fireball behind a mob is not reported under the crosshair. Built through
+so a fireball behind a mob is not reported under the crosshair. A player
+fireball owner is valid only when `Runtime::target_people` says the owner is
+neither a friend nor a teammate, matching `isValidArrowOwner`. Built through
 the signed Nov 22 SDK and launcher `0.2.108`: `native-f1bb66f-cad62a9c97a8`,
 then `native-f1bb66f-c79ee8b7a9cd` with the occlusion fix. This is
 compile/integration evidence; the host scenario is deferred with the rest of

@@ -11,6 +11,7 @@ use horizon_client::projectiles::ProjectileKind;
 use crate::game::vape_rs::targeting::entities::{
     Bounds, EntityClass, EntityView, PlayerView, threat_score,
 };
+use crate::game::vape_rs::targeting::filter::People;
 use crate::game::{Game, Screen};
 
 fn lerp(previous: [f64; 3], current: [f64; 3], partial: f64) -> [f64; 3] {
@@ -840,7 +841,7 @@ fn anti_fireball(game: &mut Game<'_>) {
         return;
     };
     let epoch = with_client(&client, |runtime| runtime.session().epoch());
-    let friends = with_client(&client, |runtime| runtime.friend_keys());
+    let people = with_client(&client, |runtime| runtime.target_people());
     let me = Me {
         id: player.entity_id,
         position: vec3(player.position),
@@ -855,7 +856,7 @@ fn anti_fireball(game: &mut Game<'_>) {
         .map(|entity| {
             let player = entity.class == EntityClass::Player;
             let valid_owner =
-                !player || !friends.iter().any(|f| f.eq_ignore_ascii_case(&entity.name));
+                !player || (!people.friend(&entity.name) && !people.teammate(&entity));
             Body {
                 id: entity.handle.id,
                 position: entity.position,
