@@ -331,6 +331,10 @@ fn inv_walk_screen(game: &Game<'_>, gui_open: bool, capturing: bool) -> inv_walk
 /// CrystalAura's target selection: the reference's two-pass candidate scan,
 /// ranking each candidate's crystal box by the damage efficiency.
 fn crystal_aura_tick(game: &mut Game<'_>) {
+    let client = crate::game::vape_rs::core::client().clone();
+    if !with_client(&client, |runtime| runtime.enabled(ModuleId::CrystalAura)) {
+        return;
+    }
     let Some(player) = game.player.as_ref() else {
         return;
     };

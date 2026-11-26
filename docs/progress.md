@@ -2980,8 +2980,11 @@ set (released otherwise). `cargo check --offline` and the native build
 The client tick HEAD now runs `crystal_aura_tick`: it scans the two-pass
 offsets, builds each candidate's crystal box, ranks by the damage
 efficiency and parks the best block in the registered target ledger. The
-actual place/break/attack loop and the rotation remain. Native build
-(`native-f1bb66f-6fcf8667284a`) passes.
+tick is gated on the module, so disabling it leaves the ledger idle. The
+selection is a placeholder: it ranks by a constant efficiency and does not
+yet test the world's crystal base, so it parks the first offset until the
+world/damage inputs land. The actual place/break/attack loop and the
+rotation remain. Native build (`native-f1bb66f-6fcf8667284a`) passes.
 
 ## 2026-11-26: CrystalAura registration
 
