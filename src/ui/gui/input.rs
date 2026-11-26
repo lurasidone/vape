@@ -330,6 +330,8 @@ impl Gui {
                     | Hit::RulesRemove(_)
                     | Hit::RulesCycle(_)
                     | Hit::RulesProfile(_)
+                    | Hit::RulesMode(_)
+                    | Hit::RulesSlot(_)
                     | Hit::RulesAction
                     | Hit::Popup
                     | Hit::Focus(..)
@@ -698,6 +700,17 @@ impl Gui {
             Hit::RulesProfile(name) => {
                 if let Some(editor) = self.rules_editor.as_mut() {
                     editor.profile = name;
+                    editor.slot = None;
+                }
+            }
+            Hit::RulesMode(slots) => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.slots = slots;
+                }
+            }
+            Hit::RulesSlot(slot) => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.slot = Some(slot);
                 }
             }
             Hit::RulesAction => {
@@ -708,7 +721,12 @@ impl Gui {
             Hit::RulesAdd => {
                 if let Some(mut editor) = self.rules_editor.take() {
                     let mut profiles = rules_editor::profiles(view);
-                    match rules_editor::add(&mut profiles, &editor) {
+                    let result = if editor.slots {
+                        rules_editor::set_slot(&mut profiles, &editor)
+                    } else {
+                        rules_editor::add(&mut profiles, &editor)
+                    };
+                    match result {
                         Ok(()) => {
                             editor.item.clear();
                             self.rules_editor = Some(editor);

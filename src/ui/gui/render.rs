@@ -1497,9 +1497,9 @@ impl Gui {
         let (width, height) = self.logical();
         let panel = Rect(
             ((width - 300.0) / 2.0).max(4.0),
-            ((height - 200.0) / 2.0).max(4.0),
+            ((height - 220.0) / 2.0).max(4.0),
             300.0_f32.min(width - 8.0),
-            200.0_f32.min(height - 8.0),
+            220.0_f32.min(height - 8.0),
         );
         l.rounded(
             Rect(panel.0 - 0.5, panel.1 - 0.5, panel.2 + 1.0, panel.3 + 1.0),
@@ -1516,6 +1516,23 @@ impl Gui {
             ROW_SCALE,
             Align::Left,
         );
+        for (label, slots, left) in [("ITEMS", false, 116.0), ("SLOTS", true, 72.0)] {
+            let tab = Rect(panel.0 + panel.2 - left, panel.1 + 4.0, 40.0, 12.0);
+            let active = editor.slots == slots;
+            if active {
+                l.rounded(tab, PRESSED);
+            }
+            l.row_label(
+                tab.0 + tab.2 / 2.0,
+                tab.1,
+                tab.3,
+                label,
+                if active { self.accent } else { MUTED },
+                SMALL_SCALE,
+                Align::Center,
+            );
+            l.hit(tab, Hit::RulesMode(slots));
+        }
         l.icon(panel.0 + panel.2 - 13.0, panel.1 + 6.0, 1.0, &CROSS, MUTED);
         l.hit(
             Rect(panel.0 + panel.2 - 18.0, panel.1 + 2.0, 16.0, 14.0),
@@ -1547,44 +1564,84 @@ impl Gui {
         let add_y = panel.1 + panel.3 - 30.0;
         let mut y = panel.1 + 38.0;
         if let Some(profile) = editor.selected(&profiles) {
-            let room = ((add_y - y) / 15.0).floor().max(0.0) as usize;
-            for (i, rule) in profile.items.iter().enumerate().take(room) {
-                let row = Rect(panel.0 + 6.0, y, panel.2 - 12.0, 14.0);
-                if row.contains(self.hover) {
-                    l.fill(row, PRESSED);
+            if editor.slots {
+                for slot in 0..9u8 {
+                    let row = Rect(panel.0 + 6.0, y, panel.2 - 12.0, 14.0);
+                    if editor.slot == Some(slot) {
+                        l.rounded(row, PRESSED);
+                    } else if row.contains(self.hover) {
+                        l.fill(row, PRESSED);
+                    }
+                    l.row_label(
+                        row.0 + 2.0,
+                        row.1,
+                        row.3,
+                        &format!("Slot {}", slot + 1),
+                        FG,
+                        FIELD_SCALE,
+                        Align::Left,
+                    );
+                    let label = profile
+                        .slot_rule(slot)
+                        .map(|r| r.filter.label())
+                        .unwrap_or_else(|| "None".into());
+                    l.row_label(
+                        row.0 + row.2 - 6.0,
+                        row.1,
+                        row.3,
+                        &fit(&label, row.2 - 50.0, FIELD_SCALE),
+                        MUTED,
+                        FIELD_SCALE,
+                        Align::Right,
+                    );
+                    l.hit(row, Hit::RulesSlot(slot));
+                    y += 15.0;
                 }
-                l.row_label(
-                    row.0 + 2.0,
-                    row.1,
-                    row.3,
-                    &fit(&rule.filter.label(), row.2 - 60.0, FIELD_SCALE),
-                    FG,
-                    FIELD_SCALE,
-                    Align::Left,
-                );
-                l.row_label(
-                    row.0 + row.2 - 16.0,
-                    row.1,
-                    row.3,
-                    rule.action.name(),
-                    MUTED,
-                    SMALL_SCALE,
-                    Align::Right,
-                );
-                l.hit(Rect(row.0, row.1, row.2 - 16.0, row.3), Hit::RulesCycle(i));
-                l.icon(row.0 + row.2 - 8.0, row.1 + 4.5, 1.0, &CROSS, MUTED);
-                l.hit(
-                    Rect(row.0 + row.2 - 14.0, row.1, 14.0, row.3),
-                    Hit::RulesRemove(i),
-                );
-                y += 15.0;
+            } else {
+                let room = ((add_y - y) / 15.0).floor().max(0.0) as usize;
+                for (i, rule) in profile.items.iter().enumerate().take(room) {
+                    let row = Rect(panel.0 + 6.0, y, panel.2 - 12.0, 14.0);
+                    if row.contains(self.hover) {
+                        l.fill(row, PRESSED);
+                    }
+                    l.row_label(
+                        row.0 + 2.0,
+                        row.1,
+                        row.3,
+                        &fit(&rule.filter.label(), row.2 - 60.0, FIELD_SCALE),
+                        FG,
+                        FIELD_SCALE,
+                        Align::Left,
+                    );
+                    l.row_label(
+                        row.0 + row.2 - 16.0,
+                        row.1,
+                        row.3,
+                        rule.action.name(),
+                        MUTED,
+                        SMALL_SCALE,
+                        Align::Right,
+                    );
+                    l.hit(Rect(row.0, row.1, row.2 - 16.0, row.3), Hit::RulesCycle(i));
+                    l.icon(row.0 + row.2 - 8.0, row.1 + 4.5, 1.0, &CROSS, MUTED);
+                    l.hit(
+                        Rect(row.0 + row.2 - 14.0, row.1, 14.0, row.3),
+                        Hit::RulesRemove(i),
+                    );
+                    y += 15.0;
+                }
             }
         }
+        let hint = if editor.slots {
+            "Slot filter".to_string()
+        } else {
+            format!("New rule: {}", editor.action.name())
+        };
         l.row_label(
             panel.0 + 8.0,
             add_y - 12.0,
             12.0,
-            &format!("New rule: {}", editor.action.name()),
+            &hint,
             MUTED,
             SMALL_SCALE,
             Align::Left,
@@ -1620,14 +1677,16 @@ impl Gui {
         l.hit(field, Hit::Focus("rules.item".into(), field));
         l.button(
             Rect(panel.0 + panel.2 - 64.0, add_y, 28.0, 14.0),
-            "ADD",
+            if editor.slots { "SET" } else { "ADD" },
             Hit::RulesAdd,
         );
-        l.button(
-            Rect(panel.0 + panel.2 - 32.0, add_y, 24.0, 14.0),
-            "ACT",
-            Hit::RulesAction,
-        );
+        if !editor.slots {
+            l.button(
+                Rect(panel.0 + panel.2 - 32.0, add_y, 24.0, 14.0),
+                "ACT",
+                Hit::RulesAction,
+            );
+        }
     }
     pub(super) fn edit_paint(&self, l: &mut Layout, rect: Rect, value: &str) {
         let len = value.chars().count();

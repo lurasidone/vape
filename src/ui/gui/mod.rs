@@ -253,6 +253,8 @@ enum Hit {
     /// Opens the InventoryManager filter-rule editor.
     RulesOpen,
     RulesProfile(String),
+    RulesMode(bool),
+    RulesSlot(u8),
     RulesAdd,
     RulesRemove(usize),
     RulesCycle(usize),
@@ -1137,6 +1139,33 @@ mod tests {
             panic!("{actions:?}");
         };
         assert_eq!(parse_profiles(value.as_str().unwrap(), &[]).unwrap()[0].items.len(), 1);
+        // The SLOTS tab sets a hotbar slot's filter from the same field.
+        view.values[rules_editor::PROFILES] = value.clone();
+        gui.frame(&view, (400.0, 300.0));
+        let slots = centre(&gui, &|hit| matches!(hit, Hit::RulesMode(true)));
+        assert!(click(&mut gui, &view, slots).is_empty());
+        gui.frame(&view, (400.0, 300.0));
+        let slot = centre(&gui, &|hit| matches!(hit, Hit::RulesSlot(3)));
+        assert!(click(&mut gui, &view, slot).is_empty());
+        gui.frame(&view, (400.0, 300.0));
+        let field = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::Focus(f, _) if f == "rules.item"),
+        );
+        click(&mut gui, &view, field);
+        gui.commit_text("water_bucket", false);
+        gui.frame(&view, (400.0, 300.0));
+        let set = centre(&gui, &|hit| matches!(hit, Hit::RulesAdd));
+        let actions = click(&mut gui, &view, set);
+        let [Action::Set(_, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        let parsed = parse_profiles(value.as_str().unwrap(), &[]).unwrap();
+        assert_eq!(
+            parsed[0].slot_rule(3).unwrap().filter,
+            Filter::Item("water_bucket".into())
+        );
+        view.values[rules_editor::PROFILES] = value.clone();
         // The cross closes the editor; Escape also does.
         gui.frame(&view, (400.0, 300.0));
         let close = centre(&gui, &|hit| matches!(hit, Hit::RulesClose));

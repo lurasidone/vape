@@ -19,6 +19,10 @@ pub struct RulesEditor {
     pub item: String,
     /// The new rule's action.
     pub action: Action,
+    /// The editor's tab: the profile's item rules or its hotbar slot rules.
+    pub slots: bool,
+    /// The selected hotbar slot (0..9) in the slot tab.
+    pub slot: Option<u8>,
 }
 
 impl RulesEditor {
@@ -27,6 +31,8 @@ impl RulesEditor {
             profile: profiles.first().map(|p| p.name.clone()).unwrap_or_default(),
             item: String::new(),
             action: Action::Remove,
+            slots: false,
+            slot: None,
         }
     }
 
@@ -88,6 +94,22 @@ pub fn add(profiles: &mut [Profile], editor: &RulesEditor) -> Result<(), String>
         slot: None,
         action: editor.action,
     });
+    Ok(())
+}
+
+/// Sets the selected hotbar slot's filter from the editor's filter text.
+pub fn set_slot(profiles: &mut [Profile], editor: &RulesEditor) -> Result<(), String> {
+    let item = editor.item.trim();
+    if item.is_empty() {
+        return Err("Enter an item or matcher id".into());
+    }
+    let Some(slot) = editor.slot.filter(|s| *s < 9) else {
+        return Err("Select a hotbar slot".into());
+    };
+    let profile = editor
+        .selected_mut(profiles)
+        .ok_or("No inventory profile")?;
+    profile.slot_rule_mut(slot).filter = Filter::parse(Some(&json!(item)));
     Ok(())
 }
 
@@ -158,6 +180,23 @@ mod tests {
         assert_eq!(list[0].items.len(), 1);
         assert!(!remove(&mut list, &editor, 3));
         assert!(!cycle(&mut list, &editor, 3));
+    }
+
+    #[test]
+    fn a_hotbar_slot_takes_the_editor_filter_and_round_trips() {
+        let mut list = profiles();
+        let mut editor = RulesEditor::new(&list);
+        editor.slots = true;
+        editor.slot = Some(3);
+        editor.item = "minecraft:water_bucket".into();
+        set_slot(&mut list, &editor).unwrap();
+        let rule = list[0].slot_rule(3).unwrap();
+        assert_eq!(rule.filter, Filter::Item("water_bucket".into()));
+        editor.item.clear();
+        assert!(set_slot(&mut list, &editor).is_err());
+        let text = text(&list);
+        let parsed = parse_profiles(&text, &[]).unwrap();
+        assert_eq!(parsed[0].slot_rule(3).unwrap().filter, Filter::Item("water_bucket".into()));
     }
 
     #[test]

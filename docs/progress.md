@@ -3154,13 +3154,15 @@ The InventoryManager's "Inventory" setting has an EDIT button that opens the
 filter-rule editor popup: the profile tabs, the selected profile's item rules
 (each row's filter label, click to cycle the action, the cross removes it), the
 new-rule action cycle and an ADD row (a matcher id/name or a concrete item id).
+A SLOTS tab lists the nine hotbar slots with their filters; selecting one and
+SET applies the field's filter to that slot.
 The edits write the `inventory.inventory-manager.profiles` JSON through the
 runtime's own `Profile`/`Rule` model, so the parser, presets and slot rules stay
 the single source of truth. The reference's shared-preset condition builder
 (`customRule` conditions) and the remaining picker classes are not ported.
-`cargo test --offline --lib` passes 508 tests, including the editor's model
-(add/remove/cycle/JSON round-trip) and a click-GUI test (open, type, ADD,
-cycle, remove, close). `xtask pack` and the `.hnmod` bundle pass. The GUI
+`cargo test --offline --lib` passes 509 tests, including the editor's model
+(add/remove/cycle/slot/JSON round-trip) and a click-GUI test (open, type, ADD,
+cycle, remove, SLOTS/SET, close). `xtask pack` and the `.hnmod` bundle pass. The GUI
 scenario is focus-blocked offscreen (see decisions), and the host build is
 blocked in this environment: `horizon-rust/horizon-mixins` returns 404 and the
 local `../horizon` source marker no longer matches the pin, so the editor is

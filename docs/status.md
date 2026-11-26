@@ -24,8 +24,9 @@ docs/features.csv holds 489 rows: **219 validated**, 42 integrated,
 owning module ([decisions](decisions.md)); a review of all 97 helper rows
 moved 19 of them on 2026-10-31, and most of the remaining not-started rows
 are the 47 classes of the inventory-filter GUI editor: its item-rule core is
-now integrated (a popup edits the profile's filters/actions on the same
-`Profile`/`Rule` JSON; 508 lib tests pass), while the shared-preset condition
+now integrated (a popup edits the profile's item rules and hotbar slot
+filters on the same `Profile`/`Rule` JSON; 509 lib tests pass), while the
+shared-preset condition
 builder and the remaining picker classes are not ported. `validated` always means a
 passing fresh-home host scenario with evidence in docs/evidence;
 `integrated` means hooked and running in the host without a full scenario.
