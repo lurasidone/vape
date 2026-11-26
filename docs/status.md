@@ -32,12 +32,13 @@ passing fresh-home host scenario with evidence in docs/evidence;
 The ledger above is the 2026-11-01 state. The signed Nov 22 SDK
 (`f1bb66f353cf67f2aa4665293fc75c8d91186fc7`, launcher `0.2.108`) split the
 client library out of the game crate, so the native bundle was rebuilt and
-some hook points moved. Current full build: `native-f1bb66f-0b8365d4fc48`.
+some hook points moved. Current full build: `native-f1bb66f-76d3241d8036`.
 
-- **NoFall** is applied at `Game::send`: a `HEAD` on `remote_send_state` sets
-  the claim, and a `MODIFY_ARG` on `self.send_body(packet)` rewrites the
-  position packet's on-ground bit (and the managed rotation). Normal and
-  AntiCheat were validated on LAN host/guest falls.
+- **NoFall** is applied at `remote_send_state`: a `HEAD` sets the claim, and
+  a `MODIFY_ARG` on `remote_send_state_body`'s `r.position_sender.update`
+  rewrites the position packet's on-ground bit (and the managed rotation).
+  Normal and AntiCheat were validated on LAN host/guest falls; Normal also
+  passes the current movement batch (13-block drop, no damage).
 - **NoSlowdown** is an `AFTER_CALL` on `self.sync_player_body` in
   `tick_local_player_body`; validated on an integrated bow-draw walk
   (0.81 -> 4.06 blocks in 20 ticks).
@@ -45,11 +46,26 @@ some hook points moved. Current full build: `native-f1bb66f-0b8365d4fc48`.
   `remote_send_state`; Replace was validated on LAN (20 -> 10 damage, potion
   consumed, health 14, pitch unchanged).
 - **Timer** uses `current-timer-steps`; its 2x speed was measured on the
-  current SDK build. The first scenario batch also passes Timer, NoFall,
-  Sprint, Parkour, AutoArmor and AutoTotem on the current build; Fly's
+  current SDK build. The smoke on `native-f1bb66f-76d3241d8036` passes
+  **27/27**: Sprint (including controller-held and pause/resume), Parkour,
+  AutoArmor, AutoTotem, Panic disable/restore, death/respawn and the log.
+  The movement batch on the same build passes **46/52**: Timer, NoFall
+  Normal/AntiCheat, Step, Anti-AFK and the input paths pass; Fly's
   rise/hover pass but its forward move is missing, and Speed/LongJump fail
-  because the `fly-move` replacement is not available. See
-  `docs/progress.md` (2026-11-26).
+  because the `fly-move` replacement is not available. AntiFall's lagback
+  and its scenario bind check also fail. See `docs/progress.md`
+  (2026-11-26).
+- **Combat** passes **39/39** on the current build (AutoClicker,
+  RightClicker/FastPlace, Reach, HitBoxes, NoItemRelease, Regen,
+  PotionSaver).
+- **Inventory** passes the record (Refill, ChestSteal, AutoTotem), the
+  planner cases (InvCleaner, InventoryManager, AutoHotbar, ArmorSwitch) and
+  the ChestSteal/AutoTotem parity.
+- **Render** single player passes **18/21** and the LAN host/guest **12/14**.
+  Search's highlight, the bow trajectory against a block, the Hit-Only
+  indicator, the tracers and the MurderFinder callout fail.
+- **HUD** modes **5/5**, readouts **7/7**, layouts **8/8**; the HUD detail
+  GUI-editor half still uses the old fixed click coordinates.
 - **Target Info** counts a locally thrown heal potion through the existing
   `use_potion_item` hook; the old `launch_thrown` target is gone.
 - **Blocked by the crate split:** Fly, Speed, LongJump, InvWalk and SafeWalk

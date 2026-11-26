@@ -29,28 +29,6 @@ helper = "src/adapters/current_control_keys.rs"
 bindings = [{ name = "name", ty = "&str", value = "name" }]
 
 [[native.mixin]]
-id = "game-key-capture"
-target = "horizon_client::game::play_input::Game::mapped_key"
-kind = "HEAD"
-helper = "src/adapters/current_keys.rs"
-bindings = [
-  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
-  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },
-  { name = "pressed", ty = "bool", value = "pressed" },
-  { name = "repeat", ty = "bool", value = "repeat" },
-]
-
-[[native.mixin]]
-id = "agent-key-capture"
-target = "horizon_client::game::control::Game<'_>::control_key_down"
-kind = "HEAD"
-helper = "src/adapters/current_agent_keys.rs"
-bindings = [
-  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
-  { name = "key", ty = "winit::keyboard::KeyCode", value = "key" },
-]
-
-[[native.mixin]]
 id = "client-hud"
 target = "horizon_client::game::extras::Game<'_>::draw_extras"
 kind = "HEAD"

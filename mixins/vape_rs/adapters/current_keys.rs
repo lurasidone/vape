@@ -24,6 +24,10 @@ fn on_key(
         && game.server_packs.prompt.is_none();
     let client = crate::game::vape_rs::core::client();
     crate::game::vape_rs::core::with_client(&client, |runtime| {
-        runtime.key(module, action, accepts_input);
+        // The module is already resolved from the key; do not ask the bind
+        // matcher to match a key string it never saw.
+        if action == crate::game::vape_rs::input::KeyAction::Press {
+            runtime.toggle(module, accepts_input);
+        }
     });
 }

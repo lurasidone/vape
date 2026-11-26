@@ -21,7 +21,9 @@ def run(resources):
                       'hud.fps': {'enabled': True}, 'hud.compass': {'enabled': True}},
                       'settings': {'hud.coordinates.display': 'vertical',
                                    'hud.fps.y': 112, 'hud.compass.x': 46, 'hud.compass.y': 180,
-                                   'hud.compass.binds': ['KeyC']}})
+                                   'hud.compass.binds': ['KeyC'],
+                                   # The control socket has no right-shift alias.
+                                   'client.gui.binds': ['LeftShift']}})
         session.launch()
         for yaw, label in [(-180, 'north'), (-90, 'east'), (0, 'south'), (90, 'west')]:
             session.call('look', str(yaw), '0')
@@ -32,7 +34,7 @@ def run(resources):
         session.call('wait', '2')
         session.capture('compass-disabled')
         assert session.saved()['modules']['hud.compass']['enabled'] is False
-        session.call('key', 'rshift', 'tap')
+        session.call('key', 'shift', 'tap')
         session.capture('gui')
         # HUD modules are listed by name in the HUD editor's centred frame.
         session.call('click-at', '107', '232')
@@ -47,7 +49,7 @@ def run(resources):
         session.capture('horizontal-selected')
         assert session.saved()['settings']['hud.coordinates.display'] == 'horizontal'
         session.call('click-at', '26', '287')  # BACK
-        session.call('key', 'rshift', 'tap')
+        session.call('key', 'shift', 'tap')
         session.capture('horizontal-biome')
         session.close()
         session.launch()

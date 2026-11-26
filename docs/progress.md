@@ -2854,3 +2854,70 @@ menu: Sprint does not re-press on resume, F10 Panic does not disable, and the
 synthetic sprint stays held. Those are menu-path bugs, not focus; the next
 step is the Sprint latch/`release_input` path and the panic key after a
 resume.
+
+## 2026-11-26: Sprint resume and Panic on the current SDK
+
+The pause menu drops `game.focused`; the input gate and the Sprint latch both
+read it, so Sprint never re-pressed on resume and F10 was rejected. The
+scenario harness now re-focuses after `pause`/`resume` (`xdotool windowfocus`
+under `VAPE_RS_XVFB`, the real `pad focus true` winit event otherwise).
+
+F10 then toggled twice: the full manifest had `client-input` (debug_key) plus
+`game-key-capture`/`agent-key-capture` (the current-SDK `mapped_key` and
+`control_key_down` hooks). A control-socket tap ran two of them, so the first
+panic disabled the modules and the second immediately restored them; the
+smoke saw them enabled. Removed the two current-SDK key captures from the
+full manifest; `client-input` is the one F8/F9/F10 handler. The HUD project
+keeps them.
+
+`Runtime::toggle` toggles a module the current-SDK adapter already resolved
+from its key; `key`/`key_named` need the key to match the module's binds.
+`current_keys.rs` uses it for the HUD project's F8/F9/F10.
+
+Smoke on `native-f1bb66f-76d3241d8036` under Xvfb: **27/27** (terrain, Sprint
+bind/held/controller/release/pause/resume, Parkour, AutoArmor, AutoTotem,
+Panic disable/restore, death/respawn, log). Scenario roots are ignored under
+`target/scenarios/smoke-*`.
+
+## 2026-11-26: movement batch on the rebuilt SDK
+
+`movement_scenario.py` on `native-f1bb66f-76d3241d8036` under Xvfb:
+**46/52**. Timer (all), NoFall Normal and AntiCheat (10.0 off, 1.0 on),
+Step, Anti-AFK, the world/session checks and the input paths pass. Fly
+rise/hover/gravity pass; Fly forward, Speed Bhop, Speed AntiCheat B and
+LongJump fail because the `fly-move` replacement is not available.
+AntiFall's bind check and lagback fail. The harness's `reset` now respawns
+before releasing and teleporting after a fall test; the first run stopped on
+the death screen at `mouse right up`.
+
+## 2026-11-26: scenario batch 2 (combat, inventory, render, HUD)
+
+Combat on `native-f1bb66f-76d3241d8036` under Xvfb: **39/39**. AutoClicker,
+RightClicker/FastPlace, Reach, HitBoxes, NoItemRelease, Regen and
+PotionSaver pass their host checks (CPS and the server attack log, pick
+range, eaten food, health/effect clock).
+
+Inventory on the same build: the record (`tools/inventory_scenario.py`,
+`inv-rec-*`) passes (refill interrupted at 1 soup and complete at 6 stone +
+3 soups and 2 main soups; chest steal 1 after interrupt, 6 after reopen;
+AutoTotem offhand totem with 1 main). The planner cases (`inv-plan-*`:
+InvCleaner, InventoryManager, AutoHotbar, ArmorSwitch, including interrupted
+and cursor-held recovery) and the ChestSteal/AutoTotem parity
+(`inv-parity-*`) pass their assertions.
+
+Render single player (`render_scenario.py --part sp`, `render-sp-*`):
+**18/21**. Search's highlight, the bow trajectory against a block and the
+Hit-Only indicator fail their screenshot checks; storage/spawner/name-tag/
+item/block/bed/projectile/explosion/indicator/trajectory (mob/snowball/
+crossbow) pass. Render LAN (`--part lan`, `render-host-*`/`render-guest-*`):
+**12/14**; ESP 2D/3D, name tags, murder-finder outlines, health, arrows,
+prop hunt, storage and outline pass, and so does the Enemy-Only tracer;
+tracers and the MurderFinder callout fail.
+
+HUD: `hud_modes` **5/5** (Keystrokes and Clock styles), `hud_readouts`
+**7/7** (Health and Reach), `hud_detail --part layouts` **8/8** (Armor,
+Potion, Coords, FPS and Compass at GUI scales 1 and 2, settings and
+hide/restore). The HUD detail GUI-editor half is stale: its fixed click
+coordinates no longer match the current layout, and the control socket has
+no `rshift`; the scenario now seeds the GUI bind to LeftShift and uses
+`shift`.

@@ -766,6 +766,18 @@ impl Runtime {
     pub fn key(&mut self, module: ModuleId, action: KeyAction, accepts_input: bool) {
         self.key_named(module, "integration-key", action, accepts_input);
     }
+    /// Toggle a module from a key the game has already resolved to it (the
+    /// current SDK's F8/F9/F10 path). `key`/`key_named` need the key to match
+    /// the module's binds; this path has no key left to match.
+    pub fn toggle(&mut self, module: ModuleId, accepts_input: bool) {
+        if !accepts_input {
+            return;
+        }
+        let next = !self.enabled(module);
+        if !self.refuse_hidden(module, next) {
+            self.set_enabled(module, next);
+        }
+    }
     fn mode(&self, module: ModuleId) -> BindingMode {
         match self
             .settings

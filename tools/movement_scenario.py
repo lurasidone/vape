@@ -72,6 +72,11 @@ class Run:
         self.call('mouse', 'right', 'up')
 
     def reset(self, x=0.5, z=0.5, yaw=0, y=FLOOR + 1):
+        # A fall test can leave the player on the death screen; its screen
+        # takes no mouse release, and the teleport needs a live player.
+        if self.call('state').get('screen') == 'dead':
+            self.call('respawn')
+            self.wait(4)
         self.release()
         # A server-side teleport: the client tp is a move the server rejects
         # when it is long or passes through blocks.

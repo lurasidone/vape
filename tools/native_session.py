@@ -137,7 +137,20 @@ class NativeSession:
         (self.root / 'commands.json').write_text(json.dumps(self.commands, indent=2))
         if result.returncode:
             raise RuntimeError(f'{args}: {result.stdout} {result.stderr}')
+        if args and args[0] in ('pause', 'resume'):
+            self.refocus()
         return json.loads(result.stdout)
+
+    def refocus(self):
+        """Restore game.focused after the pause menu, with the real X focus
+        under Xvfb or the real winit focus event otherwise."""
+        if os.environ.get('VAPE_RS_XVFB'):
+            subprocess.run(['xdotool', 'search', '--name', 'Horizon', 'windowfocus'],
+                           env=self.env, text=True, capture_output=True)
+        else:
+            subprocess.run([str(self.ctl), '--socket', str(self.socket),
+                            'pad', 'focus', 'true'], env=self.env, text=True,
+                           capture_output=True)
 
     def launch(self, creative=True, world='NativeScenario', extra=()):
         if self.process is not None:
