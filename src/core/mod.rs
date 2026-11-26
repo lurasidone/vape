@@ -41,6 +41,8 @@ use lifecycle::{CleanupReason, Context, Session};
 use profiles::{Document, Profiles};
 use serde_json::{Value, json};
 use settings::{Definition, Kind, Settings};
+use super::modules::combat::rotation::{Claimant, Step};
+use self::rotation_runtime::Silent;
 use std::{
     collections::{BTreeMap, VecDeque},
     path::PathBuf,
@@ -641,6 +643,33 @@ impl Runtime {
     }
     pub fn bed_breaker_target(&self) -> Option<bed_breaker_runtime::Target> {
         self.bed_breaker.target()
+    }
+    /// `RotationManager.getManagedYaw/Pitch`: the silent rotation, else `view`.
+    pub fn managed_view(&mut self, view: (f32, f32)) -> (f32, f32) {
+        rotation_runtime::Shared::of(&mut self.combat, &mut self.rotations).managed(view)
+    }
+    pub fn set_bed_breaker_rotation(&mut self, view: (f32, f32), target: (f32, f32)) {
+        rotation_runtime::Shared::of(&mut self.combat, &mut self.rotations).silent(
+            Claimant::BedBreaker,
+            view,
+            Silent {
+                target,
+                step: Step {
+                    counts: 5.0,
+                    clamp: true,
+                    proportional: true,
+                    linear: true,
+                },
+                tolerance: 1.0,
+            },
+        );
+    }
+    pub fn release_bed_breaker_rotation(&mut self) {
+        rotation_runtime::Shared::of(&mut self.combat, &mut self.rotations)
+            .release(Claimant::BedBreaker);
+    }
+    pub fn bed_breaker_server_rotation(&self) -> Option<[i32; 3]> {
+        self.bed_breaker.server_rotation()
     }
     pub fn set_enabled(&mut self, module: ModuleId, enabled: bool) {
         if module == ModuleId::Panic {

@@ -52,6 +52,32 @@ pub fn pre_motion(game: &mut Game<'_>) {
     // ("Invalid move player packet received"). The step still resets Speed
     // and runs the timer.
     with_client(&client, |runtime| runtime.step_motion(sample));
+    let server_block = with_client(&client, |runtime| runtime.bed_breaker_server_rotation());
+    if let Some(block) = server_block {
+        let Some(player) = game.player.as_ref() else {
+            return;
+        };
+        let eye = [
+            player.position.x,
+            player.position.y + f64::from(player.dimensions.eye_height),
+            player.position.z,
+        ];
+        let target = [
+            f64::from(block[0]) + 0.5,
+            f64::from(block[1]) + 0.5,
+            f64::from(block[2]) + 0.5,
+        ];
+        let angles = bed_angles(eye, target);
+        with_client(&client, |runtime| {
+            runtime.set_bed_breaker_rotation((game.yaw, game.pitch), angles)
+        });
+    } else {
+        with_client(&client, |runtime| runtime.release_bed_breaker_rotation());
+    }
+    let (yaw, pitch) =
+        with_client(&client, |runtime| runtime.managed_view((game.yaw, game.pitch)));
+    game.yaw = yaw;
+    game.pitch = pitch;
     let ground = if fly {
         Some(false)
     } else {
@@ -63,4 +89,15 @@ pub fn pre_motion(game: &mut Game<'_>) {
 /// The claimed on-ground value for the next movement packet, if any.
 pub fn take_ground() -> Option<bool> {
     GROUND.with(|g| g.take())
+}
+
+/// The yaw/pitch from an eye to a block centre, in the game's convention.
+fn bed_angles(eye: [f64; 3], target: [f64; 3]) -> (f32, f32) {
+    let dx = target[0] - eye[0];
+    let dy = target[1] - eye[1];
+    let dz = target[2] - eye[2];
+    (
+        (-dx).atan2(dz).to_degrees() as f32,
+        (-dy).atan2((dx * dx + dz * dz).sqrt()).to_degrees() as f32,
+    )
 }

@@ -2966,3 +2966,11 @@ the block size and the visibility animation; the chosen target is yellow,
 and an active Hypixel cover shows its tool icon. `cargo check --offline`
 and the native build (`native-f1bb66f-cf4d9c23e0cc`) pass. The Hypixel
 break rotation/movement fix remains.
+
+## 2026-11-26: BedBreaker server rotation
+
+`managed_view` in `pre_motion` now writes the silent rotation into the
+outgoing yaw/pitch, and the host drives `Claimant::BedBreaker`'s silent
+rotation at the Hypixel cover centre when the module's `server_rotation` is
+set (released otherwise). `cargo check --offline` and the native build
+(`native-f1bb66f-5200d043cad6`) pass. The movement-key remap remains.

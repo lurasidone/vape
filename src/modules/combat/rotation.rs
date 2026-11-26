@@ -19,6 +19,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Claimant {
     SilentAura,
+    BedBreaker,
     AutoMace,
     LagBlockHit,
     KnockbackDelay,
@@ -40,6 +41,7 @@ pub enum Claimant {
 impl Claimant {
     pub fn priority(self) -> u32 {
         match self {
+            Self::BedBreaker => 4,
             Self::SilentAura | Self::AutoMace | Self::LagBlockHit | Self::KnockbackDelay => 5,
             Self::HitFlick | Self::CrystalAura | Self::Scaffold | Self::WindCharge => 6,
             Self::BowAimbot | Self::AutoPearl | Self::PearlCatch => 7,
