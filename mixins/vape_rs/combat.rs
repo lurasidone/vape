@@ -804,6 +804,8 @@ fn crosshair_projectile(game: &Game<'_>) -> Option<i32> {
         let d = [hit.point[0] - eye[0], hit.point[1] - eye[1], hit.point[2] - eye[2]];
         (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt()
     });
+    // The reference's extended entity ray also stops at a nearer living body.
+    let mob = game.mob_hit_within(reach).map(|(_, distance, _)| distance);
     let mut best: Option<(i32, f64)> = None;
     for projectile in &game.creatures.projectiles {
         if !matches!(
@@ -818,6 +820,7 @@ fn crosshair_projectile(game: &Game<'_>) -> Option<i32> {
         }
         if let Some(t) = crate::game::ray_box(eye, dir, reach, projectile.bounds())
             && block.is_none_or(|b| t < b)
+            && mob.is_none_or(|m| t < m)
             && best.is_none_or(|(_, bt)| t < bt)
         {
             best = Some((projectile.id as i32, t));
