@@ -28,9 +28,10 @@ a reduced preset-condition builder are implemented-core/unit-tested (a popup
 edits the profile's item rules, hotbar slot filters and preset conditions
 (AND groups, OR across them; comma-split text entries) on the same
 `Profile`/`Rule`/`Preset` JSON; the field's matcher picker lists the registered
-matchers by group; 514 lib tests pass; the host build was blocked this
-session), while the reference's per-entry text editing and its item-specific
-picker classes are not ported.
+matchers by group and a text condition's entries reload into the field for
+editing; 514 lib tests pass; the host build was blocked this session), while
+the reference's per-entry text UI and its item-specific picker classes are
+not ported.
 `validated` always means a
 passing fresh-home host scenario with evidence in docs/evidence;
 `integrated` means hooked and running in the host without a full scenario.

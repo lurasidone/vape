@@ -255,6 +255,9 @@ pub struct RulesEditor {
     pub kind: ConditionKind,
     /// The matcher picker is open over the editor.
     pub picker: bool,
+    /// The text condition being edited (its entries load into the field and
+    /// ADD replaces them instead of adding a condition).
+    pub editing: Option<usize>,
 }
 
 impl RulesEditor {
@@ -269,6 +272,7 @@ impl RulesEditor {
             group: 0,
             kind: ConditionKind::Durability,
             picker: false,
+            editing: None,
         }
     }
 
@@ -492,6 +496,52 @@ pub fn add_group(presets: &mut [Preset], editor: &mut RulesEditor) -> bool {
     true
 }
 
+/// The selected text condition's entries, joined for the editor field.
+pub fn text_entries(presets: &[Preset], editor: &RulesEditor, index: usize) -> Option<String> {
+    let condition = editor
+        .selected_preset(presets)?
+        .groups
+        .get(editor.group)?
+        .conditions
+        .get(index)?;
+    match condition {
+        Condition::DisplayName { texts, .. }
+        | Condition::ItemName { texts, .. }
+        | Condition::Lore { texts, .. } => Some(texts.join(", ")),
+        _ => None,
+    }
+}
+
+/// Replaces the selected text condition's entries from the editor's field.
+pub fn edit_texts(
+    presets: &mut [Preset],
+    editor: &RulesEditor,
+    index: usize,
+) -> Result<(), String> {
+    let entries = texts(&editor.item);
+    if entries.is_empty() {
+        return Err("Enter the text".into());
+    }
+    if !editor.has_group(presets) {
+        return Err("The condition is gone".into());
+    }
+    let Some(condition) = editor
+        .selected_group_mut(presets)
+        .and_then(|g| g.conditions.get_mut(index))
+    else {
+        return Err("The condition is gone".into());
+    };
+    match condition {
+        Condition::DisplayName { texts, .. }
+        | Condition::ItemName { texts, .. }
+        | Condition::Lore { texts, .. } => {
+            *texts = entries;
+            Ok(())
+        }
+        _ => Err("Only text conditions have entries".into()),
+    }
+}
+
 pub fn remove_condition(presets: &mut [Preset], editor: &RulesEditor, index: usize) -> bool {
     if !editor.has_group(presets) {
         return false;
@@ -631,6 +681,16 @@ mod tests {
         assert_eq!(
             summary(&presets[0].groups[1].conditions[0]),
             "Item name contains apple, golden apple"
+        );
+        assert_eq!(
+            text_entries(&presets, &editor, 0).as_deref(),
+            Some("apple, golden apple")
+        );
+        editor.item = "pear, melon".into();
+        edit_texts(&mut presets, &editor, 0).unwrap();
+        assert_eq!(
+            summary(&presets[0].groups[1].conditions[0]),
+            "Item name contains pear, melon"
         );
         assert!(remove_condition(&mut presets, &editor, 0));
         assert!(presets[0].groups[1].conditions.is_empty());

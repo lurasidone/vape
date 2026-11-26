@@ -724,11 +724,13 @@ impl Gui {
                 if let Some(editor) = self.rules_editor.as_mut() {
                     editor.profile = name;
                     editor.slot = None;
+                    editor.editing = None;
                 }
             }
             Hit::RulesTab(tab) => {
                 if let Some(editor) = self.rules_editor.as_mut() {
                     editor.tab = tab;
+                    editor.editing = None;
                 }
             }
             Hit::RulesSlot(slot) => {
@@ -746,11 +748,13 @@ impl Gui {
                 };
                 if let Some(editor) = self.rules_editor.as_mut() {
                     editor.cycle_preset(&presets);
+                    editor.editing = None;
                 }
             }
             Hit::RulesPresetValue(uuid) => {
                 if let Some(editor) = self.rules_editor.as_mut() {
                     editor.preset = Some(uuid);
+                    editor.editing = None;
                 }
             }
             Hit::RulesNewPreset => {
@@ -764,6 +768,7 @@ impl Gui {
                         }
                     };
                     rules_editor::add_preset(&mut presets, &mut editor);
+                    editor.editing = None;
                     self.rules_editor = Some(editor);
                     return vec![Action::Set(
                         rules_editor::PRESETS.into(),
@@ -797,6 +802,26 @@ impl Gui {
                 }
             }
             Hit::RulesConditionOp(index) => {
+                if button == "MouseRight" {
+                    let presets = rules_editor::presets(view);
+                    let entries = self
+                        .rules_editor
+                        .as_ref()
+                        .and_then(|editor| rules_editor::text_entries(&presets, editor, index));
+                    match entries {
+                        Some(entries) => {
+                            if let Some(editor) = self.rules_editor.as_mut() {
+                                editor.item = entries;
+                                editor.editing = Some(index);
+                                editor.picker = false;
+                            }
+                            self.focus = Some("rules.item".into());
+                            self.cursor = TextCursor::default();
+                        }
+                        None => self.status = "Only text conditions have entries".into(),
+                    }
+                    return Vec::new();
+                }
                 if let Some(editor) = self.rules_editor.take() {
                     let mut presets = match rules_editor::parse_presets_setting(view) {
                         Ok(presets) => presets,
@@ -819,6 +844,7 @@ impl Gui {
             Hit::RulesGroup(index) => {
                 if let Some(editor) = self.rules_editor.as_mut() {
                     editor.group = index;
+                    editor.editing = None;
                 }
             }
             Hit::RulesNewGroup => {
@@ -832,6 +858,7 @@ impl Gui {
                         }
                     };
                     if rules_editor::add_group(&mut presets, &mut editor) {
+                        editor.editing = None;
                         self.rules_editor = Some(editor);
                         return vec![Action::Set(
                             rules_editor::PRESETS.into(),
@@ -868,9 +895,15 @@ impl Gui {
                                 return Vec::new();
                             }
                         };
-                        match rules_editor::add_condition(&mut presets, &editor) {
+                        let result = if let Some(index) = editor.editing {
+                            rules_editor::edit_texts(&mut presets, &editor, index)
+                        } else {
+                            rules_editor::add_condition(&mut presets, &editor)
+                        };
+                        match result {
                             Ok(()) => {
                                 editor.item.clear();
+                                editor.editing = None;
                                 self.rules_editor = Some(editor);
                                 return vec![Action::Set(
                                     rules_editor::PRESETS.into(),

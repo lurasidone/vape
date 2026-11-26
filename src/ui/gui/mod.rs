@@ -1281,6 +1281,31 @@ mod tests {
             rules_editor::summary(&presets[0].groups[1].conditions[0]),
             "Item name contains apple, golden apple"
         );
+        // A right click loads the text entries; ADD replaces them.
+        gui.frame(&view, (400.0, 300.0));
+        let row = centre(&gui, &|hit| matches!(hit, Hit::RulesConditionOp(0)));
+        gui.mouse("MouseRight", true, row, &view);
+        gui.mouse("MouseRight", false, row, &view);
+        assert_eq!(
+            gui.rules_editor.as_ref().unwrap().item,
+            "apple, golden apple"
+        );
+        assert_eq!(gui.rules_editor.as_ref().unwrap().editing, Some(0));
+        gui.rules_editor.as_mut().unwrap().item = "pear, melon".into();
+        gui.frame(&view, (400.0, 300.0));
+        let add = centre(&gui, &|hit| matches!(hit, Hit::RulesAdd));
+        let actions = click(&mut gui, &view, add);
+        let [Action::Set(id, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        assert_eq!(id, rules_editor::PRESETS);
+        view.values[rules_editor::PRESETS] = value.clone();
+        let presets = parse_presets(value.as_str().unwrap()).unwrap();
+        assert_eq!(
+            rules_editor::summary(&presets[0].groups[1].conditions[0]),
+            "Item name contains pear, melon"
+        );
+        assert_eq!(gui.rules_editor.as_ref().unwrap().editing, None);
         // The new preset stays selected, so the ITEMS tab's new rule
         // attaches it; the preset hint cycles it off and back on.
         gui.frame(&view, (400.0, 300.0));

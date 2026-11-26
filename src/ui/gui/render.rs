@@ -411,6 +411,13 @@ impl Gui {
             "Press a key or chord; left click clears the binding".into()
         } else if self.editor.is_some() {
             "Enter applies the edit; Escape cancels".into()
+        } else if self.status.is_empty()
+            && self
+                .rules_editor
+                .as_ref()
+                .is_some_and(|e| e.tab == rules_editor::Tab::Presets)
+        {
+            "Right click a text condition to edit its entries".into()
         } else {
             self.status.clone()
         };
