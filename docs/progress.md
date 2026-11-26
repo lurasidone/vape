@@ -2975,6 +2975,14 @@ rotation at the Hypixel cover centre when the module's `server_rotation` is
 set (released otherwise). `cargo check --offline` and the native build
 (`native-f1bb66f-5200d043cad6`) pass. The movement-key remap remains.
 
+## 2026-11-26: CrystalAura action gate
+
+The documented place/attack path is now disabled off the placeholder
+selection: firing `remote_use` every tick at the crosshair would spam
+right-clicks rather than place at the selected base. It returns once the
+real selector (world `is_crystal_base`, range, self-damage, the rotation and
+the reference's delay timers) lands.
+
 ## 2026-11-26: CrystalAura action path
 
 The selection tick now acts: `BreakingCrystal` attacks the tracked crystal
