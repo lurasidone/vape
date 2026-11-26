@@ -55,10 +55,9 @@ some hook points moved. Current full build: `native-f1bb66f-0b8365d4fc48`.
   in the library/render crate).
 - **Not started modules** (BedBreaker, CrystalAura, AutoAnchor, Block-In, the
   InventoryManager filter-rule editor, translations/fonts) can resume: the
-  local recovered reference is now at `../Vape-v4` (commit
-  `5a6ff6ca`, version `4.21-recovered`), untracked by this repository. The
-  original `3d600a48` / `4.21.43` checkout was unavailable; compare behavior
-  where the recovered payload differs.
+  exact reference `3d600a48` / `4.21.43` is cloned at the sibling
+  `../Vape-v4` (from `RSSeeker/Vape-v4`), outside this repository and never
+  tracked here.
 
 Scope (user decision, 2026-11-01): whether the reference's ModManager registers a
 module is not a scope criterion, and the interface is a design rebuilt from the
