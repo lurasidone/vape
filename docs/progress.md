@@ -2693,3 +2693,14 @@ covered **0.81 blocks** with NoSlowdown off and **4.06 blocks** with it on.
 Both sessions were in survival on the same stone platform and quit cleanly.
 NoSlowdown's client-side slowdown is exercised on the integrated server; the
 module's `Sprint` interaction still needs a LAN scenario.
+
+## 2026-11-25: AutoHeal motion hooks on the current SDK
+
+The full manifest kept only `auto-heal-post-motion`, and as a `HEAD` on
+`remote_send_state`; that ran before the packet and took the pre-motion look
+too early. Restored `auto-heal-pre-motion` as a `HEAD` on the same function
+and moved the post-motion work to an `AFTER_CALL` on
+`self.remote_send_state_body` (a `RETURN` hook on `remote_send_state` fails
+with a double mutable borrow of `self`). Built through the signed Nov 22 SDK
+and launcher `0.2.108`: `native-f1bb66f-c3791074135e`. This is compile-only
+evidence; the AutoHeal host scenario is still pending, as requested.

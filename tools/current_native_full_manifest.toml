@@ -693,9 +693,20 @@ bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *s
 
 
 [[native.mixin]]
-id = "auto-heal-post-motion"
+id = "auto-heal-pre-motion"
 target = "horizon_client::game::remote::Game::remote_send_state"
 kind = "HEAD"
+helper = "src/adapters/auto_heal_pre_motion.rs"
+bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
+
+[[native.mixin]]
+id = "auto-heal-post-motion"
+target = "horizon_client::game::remote::Game::remote_send_state"
+kind = "AFTER_CALL"
+selector = "self.remote_send_state_body"
+require = 1
+ordinal = 0
+result = "()"
 helper = "src/adapters/auto_heal_post_motion.rs"
 bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
 
@@ -804,10 +815,3 @@ bindings = [
   { name = "id", ty = "i32", value = "id" },
   { name = "values", ty = "&[(u8, i32, horizon_protocol::entity_data::Value)]", value = "values" },
 ]
-
-
-
-
-
-
-
