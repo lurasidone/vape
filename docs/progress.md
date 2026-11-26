@@ -2975,6 +2975,13 @@ rotation at the Hypixel cover centre when the module's `server_rotation` is
 set (released otherwise). `cargo check --offline` and the native build
 (`native-f1bb66f-5200d043cad6`) pass. The movement-key remap remains.
 
+## 2026-11-26: CrystalAura core
+
+The explosion model ports (armor/blast reduction, block density, raw and
+full damage, self-damage safety) plus the end-crystal/obsidian/base-block
+classification and the interaction point, with four unit tests. The
+placement/target submodules remain.
+
 ## 2026-11-26: BedBreaker movement remap
 
 While the Hypixel server rotation is active, `resolve_movement` presses the

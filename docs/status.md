@@ -83,7 +83,9 @@ some hook points moved. Current full build: `native-f1bb66f-76d3241d8036`.
   cover's tool. The Hypixel server rotation is driven through the silent
   rotation and the movement-key remap is in. BedBreaker's host is complete;
   its host scenario remains.
-- **Not started modules** (CrystalAura, AutoAnchor, Block-In, the
+- **CrystalAura** core ports the explosion model and block helpers; the
+  placement/target submodules remain.
+- **Not started modules** (AutoAnchor, Block-In, the
   InventoryManager filter-rule editor, translations/fonts) can resume: the
   exact reference `3d600a48` / `4.21.43` is cloned at the sibling
   `../Vape-v4` (from `RSSeeker/Vape-v4`), outside this repository and never
