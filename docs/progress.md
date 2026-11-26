@@ -2673,3 +2673,23 @@ packet, on a 41x41 stone platform at
 landed at `y=101` with `on_ground=true`, `z` about 16.6, and quit cleanly.
 The managed-rotation rewrite compiles in the same helper but still needs a
 combat scenario to prove the server sees the aimed rotation.
+
+## 2026-11-25: NoSlowdown restored on the current SDK
+
+`NoSlowdown` lost its `HEAD` on the library-crate motion tick when the SDK
+split `MotionWorld` out of the game crate. The host still sets the item-use
+slowdown on the local player in `Game::sync_player_body`, and the local tick
+calls that before the motion tick, so the hook moved to an `AFTER_CALL` on
+`self.sync_player_body` inside
+`horizon_client::game::remote::tick::Game::tick_local_player_body`. The
+helper clears `player.item_use_speed` (and `item_use_slows_sprint` when
+Sprint is on) only for the client game, not the integrated server's.
+
+Built through the signed Nov 22 SDK and launcher `0.2.108`; the launcher
+reported `Your mods are built` and selected `native-f1bb66f-7ce3df945d13`.
+Validated in a fresh integrated world at
+`target/scenarios/sdk-noslow-h1adwx62/`: with the bow drawn, 20 forward ticks
+covered **0.81 blocks** with NoSlowdown off and **4.06 blocks** with it on.
+Both sessions were in survival on the same stone platform and quit cleanly.
+NoSlowdown's client-side slowdown is exercised on the integrated server; the
+module's `Sprint` interaction still needs a LAN scenario.
