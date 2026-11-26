@@ -359,6 +359,33 @@ pub fn sort_targets(scores: &mut [TargetScore], mode: TargetMode) {
     });
 }
 
+/// The reference's `TARGET_MEMORY_MS`: the last target stays the active one
+/// for 1.2 s after it leaves the candidate list.
+pub const TARGET_MEMORY_MS: u64 = 1200;
+
+/// The reference's `rememberTarget`/`getActiveTarget` memory.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TargetMemory {
+    last: Option<(i32, u64)>,
+}
+
+impl TargetMemory {
+    pub fn remember(&mut self, id: i32, now_ms: u64) {
+        self.last = Some((id, now_ms));
+    }
+
+    /// The remembered target if it was refreshed within the memory window.
+    pub fn get(&self, now_ms: u64) -> Option<i32> {
+        self.last
+            .filter(|(_, at)| now_ms.saturating_sub(*at) <= TARGET_MEMORY_MS)
+            .map(|(id, _)| id)
+    }
+
+    pub fn clear(&mut self) {
+        self.last = None;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -472,5 +499,13 @@ mod tests {
         assert_eq!(scores[0].armor, 2.0);
         sort_targets(&mut scores, TargetMode::Health);
         assert_eq!(scores[0].health, 8.0);
+    }
+
+    #[test]
+    fn the_target_is_remembered_for_one_point_two_seconds() {
+        let mut memory = TargetMemory::default();
+        memory.remember(7, 1_000);
+        assert_eq!(memory.get(2_200), Some(7));
+        assert_eq!(memory.get(2_201), None);
     }
 }
