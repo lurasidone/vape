@@ -2814,3 +2814,26 @@ resume, F10 Panic does not disable, and the synthetic sprint stays held.
 These need a focused-window/menu-path check, not the old offscreen harness.
 `tools/native_session.py` now has `VAPE_RS_VISIBLE=1` (real window plus a Sway
 focus) for the input-gated scenarios; the offscreen path is unchanged.
+
+## 2026-11-26: scenario batch 1 (smoke and movement)
+
+Smoke on `native-f1bb66f-eb38e767897e` with the full dispatcher and a visible
+window: **24/27**. Sprint (including the controller-held case), Parkour
+(`peak 101.25` from a `100.0` start), AutoArmor, AutoTotem, death/respawn and
+the log checks pass. The three failures are after the pause menu: Sprint does
+not re-press on resume, F10 Panic does not disable, and the synthetic sprint
+stays held. That is the focused-window/menu path, not the old offscreen one.
+
+Movement scenario on the same build (`target/scenarios/movement-40r6krla/`):
+- **Timer:** all three checks pass (off 61 ticks, 2.0 -> 122, restored).
+- **Fly:** rise, hover and gravity pass; forward input moves 2.73 blocks
+  instead of the expected 7-12 (the missing `fly-move` replacement).
+- **NoFall Normal:** the 13-block drop hurts 10.0 without it and deals no
+  damage with it.
+- **Speed Bhop:** 40 forward ticks cover 7.05 blocks versus 8.29 walking
+  (the move replacement is missing).
+- **LongJump:** the first jump covers 2.21 blocks versus a 3.63 sprint jump
+  (same missing replacement); Toggle still turns off on landing.
+- **Step:** the bind toggles pass, then the first `wait` after enabling Step
+  reports `game ticks are not advancing (paused?)`; the run stops before the
+  Step checks. This needs the focused-window path (or a real Step bug).

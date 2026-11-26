@@ -45,7 +45,11 @@ some hook points moved. Current full build: `native-f1bb66f-0b8365d4fc48`.
   `remote_send_state`; Replace was validated on LAN (20 -> 10 damage, potion
   consumed, health 14, pitch unchanged).
 - **Timer** uses `current-timer-steps`; its 2x speed was measured on the
-  current SDK build.
+  current SDK build. The first scenario batch also passes Timer, NoFall,
+  Sprint, Parkour, AutoArmor and AutoTotem on the current build; Fly's
+  rise/hover pass but its forward move is missing, and Speed/LongJump fail
+  because the `fly-move` replacement is not available. See
+  `docs/progress.md` (2026-11-26).
 - **Target Info** counts a locally thrown heal potion through the existing
   `use_potion_item` hook; the old `launch_thrown` target is gone.
 - **Blocked by the crate split:** Fly, Speed, LongJump, InvWalk and SafeWalk
