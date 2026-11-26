@@ -2837,3 +2837,20 @@ Movement scenario on the same build (`target/scenarios/movement-40r6krla/`):
 - **Step:** the bind toggles pass, then the first `wait` after enabling Step
   reports `game ticks are not advancing (paused?)`; the run stops before the
   Step checks. This needs the focused-window path (or a real Step bug).
+
+## 2026-11-26: real window focus for the scenario harness
+
+`VAPE_RS_XVFB=:N` runs the game on a headless Xvfb display with
+`WAYLAND_DISPLAY` removed; after `wait-ready`, `xdotool search --name Horizon
+windowfocus` gives the window the X input focus, which winit reports as
+`game.focused`. This is the real-focus fix, not a test override, and it
+covers every helper that reads `game.focused` (`input`, `mouse_bind`,
+`frame`, `input_delays`, `inventory`, `combat`).
+
+Smoke on `native-f1bb66f-eb38e767897e` under Xvfb: **24/27**, with Sprint
+(including controller-held), Parkour, AutoArmor, AutoTotem, death/respawn and
+the log checks passing. The three remaining failures are all after the pause
+menu: Sprint does not re-press on resume, F10 Panic does not disable, and the
+synthetic sprint stays held. Those are menu-path bugs, not focus; the next
+step is the Sprint latch/`release_input` path and the panic key after a
+resume.

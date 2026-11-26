@@ -103,6 +103,13 @@ class NativeSession:
         # inherited environment must not switch that off.
         self.env.update(HORIZON_LAUNCHER_NO_SELF_UPDATE='1', HORIZON_NO_AUDIO='1',
                         HORIZON_SERVER_THREAD='1')
+        # VAPE_RS_XVFB=:N runs the game on a headless X server; xdotool can
+        # then give the window the X input focus, which winit reports as
+        # game.focused (the Wayland/Sway session here does not).
+        xvfb = os.environ.get('VAPE_RS_XVFB')
+        if xvfb:
+            self.env['DISPLAY'] = xvfb
+            self.env.pop('WAYLAND_DISPLAY', None)
         self.socket = self.root / ('ctl.json' if os.name == 'nt' else 'ctl.sock')
         self.process = None
         self.log = None
@@ -159,7 +166,15 @@ class NativeSession:
             time.sleep(0.1)
         self.call('wait-ready', '40')
         self.call('wait', '2')
-        if os.environ.get('VAPE_RS_VISIBLE') == '1':
+        if os.environ.get('VAPE_RS_XVFB'):
+            for _ in range(20):
+                focused = subprocess.run(
+                    ['xdotool', 'search', '--name', 'Horizon', 'windowfocus'],
+                    env=self.env, text=True, capture_output=True)
+                if focused.returncode == 0:
+                    break
+                time.sleep(0.1)
+        elif os.environ.get('VAPE_RS_VISIBLE') == '1':
             # The input-delay modules gate on game.focused; focus the window
             # under the Sway session the scenarios run in.
             subprocess.run(['swaymsg', '[app_id=horizon] focus'], text=True,
