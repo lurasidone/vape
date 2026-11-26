@@ -3176,16 +3176,15 @@ damage, enchantment, potion effect, quantity, display/item name, material,
 lore) with one value; clicking a condition row cycles its comparison (the six
 numeric operators, the eight text modes, or the material include flag). A text
 value splits on commas into the condition's entries; right-clicking a text
-condition loads those entries back into the field and ADD replaces them (the
-preset tab's status line says so). The preset has AND groups
+condition opens its entries as individual rows (ENTRY adds, the cross removes,
+SAVE replaces them; the preset tab's status line says so). The preset has AND groups
 (OR across them): the G1/G2 tabs select one and "+G" adds an empty group, and
 the condition add/remove/operator edits target the selected group. The cross
 removes a condition. The item
 tab's preset hint cycles the custom rule (None and each preset); a new rule
 references the selected preset by uuid, resolved from the presets setting. The
-reference's per-entry text UI (individual entry rows with their own controls;
-the port edits the entries through the one field) and its item-specific picker
-classes (the port's picker lists the registered matchers) remain. Opening
+reference's item-specific picker classes (the port's picker lists the
+registered matchers; concrete items are typed) remain. Opening
 the editor with the default empty profiles setting creates the reference's
 "Inventory #1" profile, so the editor is usable from a fresh config. Only a
 truly empty profiles/presets text is replaced; a text the model cannot parse

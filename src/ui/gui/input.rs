@@ -342,6 +342,10 @@ impl Gui {
                     | Hit::RulesNewGroup
                     | Hit::RulesPick
                     | Hit::RulesMatcher(_)
+                    | Hit::RulesEntryAdd
+                    | Hit::RulesEntryRemove(_)
+                    | Hit::RulesEntrySave
+                    | Hit::RulesEntryCancel
                     | Hit::RulesAction
                     | Hit::Popup
                     | Hit::Focus(..)
@@ -731,6 +735,57 @@ impl Gui {
                 if let Some(editor) = self.rules_editor.as_mut() {
                     editor.tab = tab;
                     editor.editing = None;
+                    editor.entries.clear();
+                }
+            }
+            Hit::RulesEntryAdd => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.entries.push(String::new());
+                }
+            }
+            Hit::RulesEntryRemove(index) => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    if index < editor.entries.len() {
+                        editor.entries.remove(index);
+                    }
+                }
+            }
+            Hit::RulesEntrySave => {
+                if let Some(mut editor) = self.rules_editor.take() {
+                    let Some(index) = editor.editing else {
+                        self.rules_editor = Some(editor);
+                        return Vec::new();
+                    };
+                    let mut presets = match rules_editor::parse_presets_setting(view) {
+                        Ok(presets) => presets,
+                        Err(message) => {
+                            self.status = format!("Invalid inventory presets: {message}");
+                            self.rules_editor = Some(editor);
+                            return Vec::new();
+                        }
+                    };
+                    match rules_editor::save_entries(&mut presets, &editor, index) {
+                        Ok(()) => {
+                            editor.editing = None;
+                            editor.entries.clear();
+                            self.rules_editor = Some(editor);
+                            return vec![Action::Set(
+                                rules_editor::PRESETS.into(),
+                                json!(rules_editor::presets_text(&presets)),
+                            )];
+                        }
+                        Err(message) => {
+                            self.status = message;
+                            self.rules_editor = Some(editor);
+                        }
+                    }
+                }
+            }
+            Hit::RulesEntryCancel => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.editing = None;
+                    editor.entries.clear();
+                    self.focus = None;
                 }
             }
             Hit::RulesSlot(slot) => {
@@ -811,11 +866,11 @@ impl Gui {
                     match entries {
                         Some(entries) => {
                             if let Some(editor) = self.rules_editor.as_mut() {
-                                editor.item = entries;
+                                editor.entries = entries;
                                 editor.editing = Some(index);
                                 editor.picker = false;
                             }
-                            self.focus = Some("rules.item".into());
+                            self.focus = None;
                             self.cursor = TextCursor::default();
                         }
                         None => self.status = "Only text conditions have entries".into(),
@@ -896,7 +951,7 @@ impl Gui {
                             }
                         };
                         let result = if let Some(index) = editor.editing {
-                            rules_editor::edit_texts(&mut presets, &editor, index)
+                            rules_editor::save_entries(&mut presets, &editor, index)
                         } else {
                             rules_editor::add_condition(&mut presets, &editor)
                         };
@@ -904,6 +959,7 @@ impl Gui {
                             Ok(()) => {
                                 editor.item.clear();
                                 editor.editing = None;
+                                editor.entries.clear();
                                 self.rules_editor = Some(editor);
                                 return vec![Action::Set(
                                     rules_editor::PRESETS.into(),

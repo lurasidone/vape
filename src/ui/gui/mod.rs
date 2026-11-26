@@ -265,6 +265,10 @@ enum Hit {
     RulesNewGroup,
     RulesPick,
     RulesMatcher(crate::inventory::rules::Matcher),
+    RulesEntryAdd,
+    RulesEntryRemove(usize),
+    RulesEntrySave,
+    RulesEntryCancel,
     RulesAdd,
     RulesRemove(usize),
     RulesCycle(usize),
@@ -685,6 +689,14 @@ impl Gui {
                     Some(self.map_drafts.entry(f.to_string()).or_default())
                 }
                 Some("rules.item") => self.rules_editor.as_mut().map(|e| &mut e.item),
+                Some(f) if f.starts_with("rules.entry.") => f
+                    .strip_prefix("rules.entry.")
+                    .and_then(|n| n.parse::<usize>().ok())
+                    .and_then(|i| {
+                        self.rules_editor
+                            .as_mut()
+                            .and_then(|e| e.entries.get_mut(i))
+                    }),
                 _ => None,
             }
         };
@@ -1281,20 +1293,29 @@ mod tests {
             rules_editor::summary(&presets[0].groups[1].conditions[0]),
             "Item name contains apple, golden apple"
         );
-        // A right click loads the text entries; ADD replaces them.
+        // A right click loads the per-entry editor; SAVE replaces the entries.
         gui.frame(&view, (400.0, 300.0));
         let row = centre(&gui, &|hit| matches!(hit, Hit::RulesConditionOp(0)));
         gui.mouse("MouseRight", true, row, &view);
         gui.mouse("MouseRight", false, row, &view);
         assert_eq!(
-            gui.rules_editor.as_ref().unwrap().item,
-            "apple, golden apple"
+            gui.rules_editor.as_ref().unwrap().entries,
+            vec!["apple".to_string(), "golden apple".to_string()]
         );
         assert_eq!(gui.rules_editor.as_ref().unwrap().editing, Some(0));
-        gui.rules_editor.as_mut().unwrap().item = "pear, melon".into();
         gui.frame(&view, (400.0, 300.0));
-        let add = centre(&gui, &|hit| matches!(hit, Hit::RulesAdd));
-        let actions = click(&mut gui, &view, add);
+        let entry = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::Focus(f, _) if f == "rules.entry.0"),
+        );
+        click(&mut gui, &view, entry);
+        gui.key("ControlLeft", KeyAction::Press);
+        gui.key("KeyA", KeyAction::Press);
+        gui.key("ControlLeft", KeyAction::Release);
+        gui.commit_text("pear", false);
+        gui.frame(&view, (400.0, 300.0));
+        let save = centre(&gui, &|hit| matches!(hit, Hit::RulesEntrySave));
+        let actions = click(&mut gui, &view, save);
         let [Action::Set(id, value)] = &actions[..] else {
             panic!("{actions:?}");
         };
@@ -1303,7 +1324,7 @@ mod tests {
         let presets = parse_presets(value.as_str().unwrap()).unwrap();
         assert_eq!(
             rules_editor::summary(&presets[0].groups[1].conditions[0]),
-            "Item name contains pear, melon"
+            "Item name contains pear, golden apple"
         );
         assert_eq!(gui.rules_editor.as_ref().unwrap().editing, None);
         // The new preset stays selected, so the ITEMS tab's new rule
@@ -1351,7 +1372,7 @@ mod tests {
             open: true,
             ..Gui::default()
         };
-        let mut view = editor_view();
+        let view = editor_view();
         click(&mut gui, &view, (30.0, 6.0 + NAV_HEADER_HEIGHT + 4.0 * ROW_HEIGHT + 10.0));
         gui.selected = Some("inventory.inventory-manager".into());
         gui.frame(&view, (400.0, 300.0));

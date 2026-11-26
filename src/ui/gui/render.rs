@@ -1638,36 +1638,74 @@ impl Gui {
                     "+G",
                     Hit::RulesNewGroup,
                 );
-                let room = ((add_y - y) / 15.0).floor().max(0.0) as usize;
-                let conditions = preset
-                    .groups
-                    .get(editor.group)
-                    .map(|g| g.conditions.as_slice())
-                    .unwrap_or(&[]);
-                for (i, condition) in conditions.iter().enumerate().take(room) {
-                    let row = Rect(panel.0 + 6.0, y, panel.2 - 12.0, 14.0);
-                    if row.contains(self.hover) {
-                        l.fill(row, PRESSED);
+                let room = ((add_y - 40.0 - y) / 15.0).floor().max(0.0) as usize;
+                if editor.editing.is_some() {
+                    for (i, entry) in editor.entries.iter().enumerate().take(room) {
+                        let row = Rect(panel.0 + 6.0, y, panel.2 - 12.0, 14.0);
+                        l.rounded(row, INSET);
+                        let shown = if entry.is_empty() { "entry" } else { entry.as_str() };
+                        l.row_label(
+                            row.0 + 4.0,
+                            row.1,
+                            row.3,
+                            &fit(shown, row.2 - 24.0, FIELD_SCALE),
+                            if entry.is_empty() { MUTED } else { FG },
+                            FIELD_SCALE,
+                            Align::Left,
+                        );
+                        let field = Rect(row.0, row.1, row.2 - 16.0, row.3);
+                        if self.focus.as_deref() == Some(&format!("rules.entry.{i}")) {
+                            let caret: String =
+                                entry.chars().take(self.cursor.caret).collect();
+                            l.fill(
+                                Rect(
+                                    row.0 + 4.0 + text_advance(&caret, FIELD_SCALE),
+                                    row.1 + 3.0,
+                                    1.0,
+                                    8.0,
+                                ),
+                                FG,
+                            );
+                        }
+                        l.hit(field, Hit::Focus(format!("rules.entry.{i}"), field));
+                        l.icon(row.0 + row.2 - 8.0, row.1 + 4.5, 1.0, &CROSS, MUTED);
+                        l.hit(
+                            Rect(row.0 + row.2 - 14.0, row.1, 14.0, row.3),
+                            Hit::RulesEntryRemove(i),
+                        );
+                        y += 15.0;
                     }
-                    l.row_label(
-                        row.0 + 2.0,
-                        row.1,
-                        row.3,
-                        &fit(&rules_editor::summary(condition), row.2 - 20.0, FIELD_SCALE),
-                        FG,
-                        FIELD_SCALE,
-                        Align::Left,
-                    );
-                    l.hit(
-                        Rect(row.0, row.1, row.2 - 16.0, row.3),
-                        Hit::RulesConditionOp(i),
-                    );
-                    l.icon(row.0 + row.2 - 8.0, row.1 + 4.5, 1.0, &CROSS, MUTED);
-                    l.hit(
-                        Rect(row.0 + row.2 - 14.0, row.1, 14.0, row.3),
-                        Hit::RulesRemoveCondition(i),
-                    );
-                    y += 15.0;
+                } else {
+                    let conditions = preset
+                        .groups
+                        .get(editor.group)
+                        .map(|g| g.conditions.as_slice())
+                        .unwrap_or(&[]);
+                    for (i, condition) in conditions.iter().enumerate().take(room) {
+                        let row = Rect(panel.0 + 6.0, y, panel.2 - 12.0, 14.0);
+                        if row.contains(self.hover) {
+                            l.fill(row, PRESSED);
+                        }
+                        l.row_label(
+                            row.0 + 2.0,
+                            row.1,
+                            row.3,
+                            &fit(&rules_editor::summary(condition), row.2 - 20.0, FIELD_SCALE),
+                            FG,
+                            FIELD_SCALE,
+                            Align::Left,
+                        );
+                        l.hit(
+                            Rect(row.0, row.1, row.2 - 16.0, row.3),
+                            Hit::RulesConditionOp(i),
+                        );
+                        l.icon(row.0 + row.2 - 8.0, row.1 + 4.5, 1.0, &CROSS, MUTED);
+                        l.hit(
+                            Rect(row.0 + row.2 - 14.0, row.1, 14.0, row.3),
+                            Hit::RulesRemoveCondition(i),
+                        );
+                        y += 15.0;
+                    }
                 }
             }
         } else if let Some(profile) = editor.selected(&profiles) {
@@ -1738,6 +1776,33 @@ impl Gui {
                     y += 15.0;
                 }
             }
+        }
+        if editor.tab == rules_editor::Tab::Presets && editor.editing.is_some() {
+            l.row_label(
+                panel.0 + 8.0,
+                add_y - 12.0,
+                12.0,
+                "Entries",
+                MUTED,
+                SMALL_SCALE,
+                Align::Left,
+            );
+            l.button(
+                Rect(panel.0 + 8.0, add_y, 40.0, 14.0),
+                "ENTRY",
+                Hit::RulesEntryAdd,
+            );
+            l.button(
+                Rect(panel.0 + panel.2 - 64.0, add_y, 28.0, 14.0),
+                "SAVE",
+                Hit::RulesEntrySave,
+            );
+            l.button(
+                Rect(panel.0 + panel.2 - 32.0, add_y, 24.0, 14.0),
+                "X",
+                Hit::RulesEntryCancel,
+            );
+            return;
         }
         let hint = match editor.tab {
             rules_editor::Tab::Presets => format!("Condition: {}", editor.kind.name()),

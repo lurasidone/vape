@@ -255,9 +255,11 @@ pub struct RulesEditor {
     pub kind: ConditionKind,
     /// The matcher picker is open over the editor.
     pub picker: bool,
-    /// The text condition being edited (its entries load into the field and
-    /// ADD replaces them instead of adding a condition).
+    /// The text condition being edited; `entries` holds its working rows and
+    /// SAVE replaces the condition's entries.
     pub editing: Option<usize>,
+    /// The working entries of the condition being edited.
+    pub entries: Vec<String>,
 }
 
 impl RulesEditor {
@@ -273,6 +275,7 @@ impl RulesEditor {
             kind: ConditionKind::Durability,
             picker: false,
             editing: None,
+            entries: Vec::new(),
         }
     }
 
@@ -496,8 +499,8 @@ pub fn add_group(presets: &mut [Preset], editor: &mut RulesEditor) -> bool {
     true
 }
 
-/// The selected text condition's entries, joined for the editor field.
-pub fn text_entries(presets: &[Preset], editor: &RulesEditor, index: usize) -> Option<String> {
+/// The selected text condition's entries, copied for the per-entry editor.
+pub fn text_entries(presets: &[Preset], editor: &RulesEditor, index: usize) -> Option<Vec<String>> {
     let condition = editor
         .selected_preset(presets)?
         .groups
@@ -507,20 +510,25 @@ pub fn text_entries(presets: &[Preset], editor: &RulesEditor, index: usize) -> O
     match condition {
         Condition::DisplayName { texts, .. }
         | Condition::ItemName { texts, .. }
-        | Condition::Lore { texts, .. } => Some(texts.join(", ")),
+        | Condition::Lore { texts, .. } => Some(texts.clone()),
         _ => None,
     }
 }
 
-/// Replaces the selected text condition's entries from the editor's field.
-pub fn edit_texts(
+/// Replaces the selected text condition's entries from the editor's rows.
+pub fn save_entries(
     presets: &mut [Preset],
     editor: &RulesEditor,
     index: usize,
 ) -> Result<(), String> {
-    let entries = texts(&editor.item);
+    let entries: Vec<String> = editor
+        .entries
+        .iter()
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .collect();
     if entries.is_empty() {
-        return Err("Enter the text".into());
+        return Err("Add at least one entry".into());
     }
     if !editor.has_group(presets) {
         return Err("The condition is gone".into());
@@ -683,11 +691,11 @@ mod tests {
             "Item name contains apple, golden apple"
         );
         assert_eq!(
-            text_entries(&presets, &editor, 0).as_deref(),
-            Some("apple, golden apple")
+            text_entries(&presets, &editor, 0),
+            Some(vec!["apple".into(), "golden apple".into()])
         );
-        editor.item = "pear, melon".into();
-        edit_texts(&mut presets, &editor, 0).unwrap();
+        editor.entries = vec!["pear".into(), "melon".into()];
+        save_entries(&mut presets, &editor, 0).unwrap();
         assert_eq!(
             summary(&presets[0].groups[1].conditions[0]),
             "Item name contains pear, melon"
