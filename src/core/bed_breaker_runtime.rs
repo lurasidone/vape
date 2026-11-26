@@ -36,6 +36,24 @@ impl BedBreaker {
         self.server_rotation = None;
     }
 
+    /// The host's scheduled scan: replace the target list with the beds found,
+    /// keeping the render state of a bed that is still there.
+    pub fn set_beds(&mut self, beds: &[[i32; 3]]) {
+        self.targets
+            .retain(|target| beds.contains(&target.position.block()));
+        for bed in beds {
+            if !self
+                .targets
+                .iter()
+                .any(|state| state.position.block() == *bed)
+            {
+                self.targets.push(BedTargetRenderState::new(BedTargetPosition::new(
+                    bed[0], bed[1], bed[2],
+                )));
+            }
+        }
+    }
+
     /// The reference's `onRender3D`/`onBedBreakerUpdate` pair: refresh the
     /// targets, animate visibility, select the last target inside the
     /// reticle, and resolve/finish the Hypixel cover.

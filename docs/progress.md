@@ -2929,3 +2929,13 @@ Registered `world.bed-breaker` in the module table, added its
 Normal/Hypixel mode definition. `cargo check --offline` passes. The host
 scan, reticle projection, `Game::pick` claim, break rotation/movement and
 indicator renderer are the next batch.
+
+## 2026-11-26: BedBreaker host scan
+
+The host scans beds every 50 ticks (the reference's scheduled action): a
+100-block x/z radius, ±20 y, one half of each adjacent pair. The runtime
+keeps the target list across ticks (`BedBreaker::set_beds`), and the
+module's disable reset clears it. `cargo check --offline` and the native
+build (`native-f1bb66f-c173b776fbb0`) pass. The reticle selection, the
+`Game::pick` claim, the break rotation/movement fix and the indicator
+renderer remain.

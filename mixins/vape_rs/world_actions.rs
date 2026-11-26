@@ -18,6 +18,8 @@ thread_local! {
     static JUMP: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
     /// AutoTotem's `suppressInput` this tick.
     static TOTEM_HOLD: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
+    /// BedBreaker's scheduled action: the reference scans every 50 ticks.
+    static BED_SCAN_TICKS: core::cell::Cell<u64> = const { core::cell::Cell::new(0) };
 }
 
 /// Keys physically held, through the key mapping (`KeyMapping.isDown` of
@@ -309,6 +311,16 @@ pub(crate) fn tick(game: &mut Game<'_>) {
         return;
     }
     let client = crate::game::vape_rs::core::client().clone();
+    // BedBreaker's scheduled action: the reference scans every 50 ticks.
+    let due = BED_SCAN_TICKS.with(|ticks| {
+        let next = ticks.get() + 1;
+        ticks.set(next);
+        next % 50 == 0
+    });
+    if due {
+        let beds = bed_scan(game);
+        with_client(&client, |runtime| runtime.bed_breaker_scan(&beds));
+    }
     // AutoTotem's silent open holds the movement keys (and attack/use) from
     // the open until one "Silent move delay" after its close.
     let totem_hold = with_client(&client, |runtime| {
@@ -470,4 +482,58 @@ fn wind_charge_tick(game: &mut Game<'_>, client: &crate::game::vape_rs::core::Cl
     if actions.jump {
         JUMP.with(|j| j.set(true));
     }
+}
+
+/// BedBreaker's `onScheduledAction` scan: beds within the reference's 100
+/// block x/z radius and ±20 y, only one half of each pair (the reference
+/// skips the foot half). The state's `part` property is not read here; the
+/// pair keeps the lower (x, z) half, which leaves the cover positions the
+/// same for either half.
+fn bed_scan(game: &Game<'_>) -> Vec<[i32; 3]> {
+    let Some(player) = game.player.as_ref() else {
+        return Vec::new();
+    };
+    let (px, py, pz) = (
+        player.position.x.floor() as i32,
+        player.position.y.floor() as i32,
+        player.position.z.floor() as i32,
+    );
+    let facts = game.res.facts();
+    let bed_at = |x: i32, y: i32, z: i32| {
+        facts
+            .get(game.world.block(x, y, z))
+            .name
+            .ends_with("_bed")
+    };
+    let mut beds = Vec::new();
+    for dx in -100..100 {
+        for dz in -100..100 {
+            let (x, z) = (px + dx, pz + dz);
+            for step in 0..20 {
+                let mut visit = |y: i32| {
+                    if !bed_at(x, y, z) {
+                        return;
+                    }
+                    let mut other = None;
+                    for (ox, oz) in [(0, 1), (0, -1), (1, 0), (-1, 0)] {
+                        if bed_at(x + ox, y, z + oz) {
+                            other = Some((x + ox, z + oz));
+                            break;
+                        }
+                    }
+                    let Some(other) = other else {
+                        return;
+                    };
+                    if (x, z) < other {
+                        beds.push([x, y, z]);
+                    }
+                };
+                visit(py + step);
+                if step != 0 {
+                    visit(py - step);
+                }
+            }
+        }
+    }
+    beds
 }

@@ -610,6 +610,15 @@ impl Runtime {
     pub fn enabled(&self, module: ModuleId) -> bool {
         self.modules[&module].enabled
     }
+    /// The host's BedBreaker scan: replace the target list with the beds the
+    /// reference's scheduled action found.
+    pub fn bed_breaker_scan(&mut self, beds: &[[i32; 3]]) {
+        if self.enabled(ModuleId::BedBreaker) {
+            self.bed_breaker.set_beds(beds);
+        } else {
+            self.bed_breaker.reset();
+        }
+    }
     pub fn set_enabled(&mut self, module: ModuleId, enabled: bool) {
         if module == ModuleId::Panic {
             if enabled {
