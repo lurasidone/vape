@@ -798,9 +798,8 @@ fn body_aabb(bounds: horizon_core::geometry::Aabb) -> Aabb {
 }
 
 /// The redirectable projectile under the view ray, unless a block is nearer.
-fn crosshair_projectile(game: &Game<'_>) -> Option<i32> {
+fn crosshair_projectile(game: &Game<'_>, reach: f64) -> Option<i32> {
     let (eye, dir) = game.aim()?;
-    let reach = game.entity_reach;
     let block = game.pick().map(|hit| {
         let d = [hit.point[0] - eye[0], hit.point[1] - eye[1], hit.point[2] - eye[2]];
         (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt()
@@ -890,7 +889,13 @@ fn anti_fireball(game: &mut Game<'_>) {
             })
         })
         .collect();
-    let crosshair = crosshair_projectile(game);
+    let reach = with_client(&client, |runtime| {
+        runtime
+            .pick_range(reach_player(game))
+            .map(|(reach, _)| reach)
+            .unwrap_or(game.entity_reach)
+    });
+    let crosshair = crosshair_projectile(game, reach);
     let mut tick = Tick {
         me,
         bodies,
