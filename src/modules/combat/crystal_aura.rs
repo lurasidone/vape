@@ -164,6 +164,79 @@ pub fn interaction_point(block: [i32; 3], facing: u8) -> [f64; 3] {
     }
 }
 
+/// The reference's `CrystalAuraActionState`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum State {
+    Idle,
+    PlacingObsidian,
+    PlacingCrystal,
+    BreakingCrystal,
+}
+
+/// The reference's `CrystalAuraAction`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Action {
+    PlacingObsidian,
+    PlacingCrystal,
+    AttackingCrystal,
+}
+
+/// The reference's `CrystalAuraActionCandidate`: the target block and the
+/// action chosen for it, with the damage efficiency that justified it.
+#[derive(Clone, Copy, Debug)]
+pub struct Candidate {
+    pub block: [i32; 3],
+    pub facing: u8,
+    pub action: Action,
+    /// The damage efficiency (the reference's `getDamage()`); 0 for a
+    /// placement-only action.
+    pub damage: f64,
+}
+
+/// The reference's `pendingRemoveEntityId`: the crystal id whose removal the
+/// next attack packet predicts, so a dead crystal is not re-attacked.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Prediction {
+    pub attacked: bool,
+    pub pending_remove: i32,
+}
+
+impl Prediction {
+    pub fn reset(&mut self) {
+        self.attacked = false;
+        self.pending_remove = -1;
+    }
+}
+
+/// The reference's `computeDamageEfficiency` bounds: the integer range the
+/// explosion search covers around the explosion centre.
+pub fn explosion_bounds(power: f32, centre: [f64; 3]) -> ([i32; 3], [i32; 3]) {
+    let reach = f64::from(power) * 2.0 + 1.0;
+    let low = [
+        (centre[0] - reach).floor() as i32,
+        (centre[1] - reach).floor() as i32,
+        (centre[2] - reach).floor() as i32,
+    ];
+    let high = [
+        (centre[0] + reach).floor() as i32,
+        (centre[1] + reach).floor() as i32,
+        (centre[2] + reach).floor() as i32,
+    ];
+    (low, high)
+}
+
+/// Whether a predicted position sits inside the explosion bounds.
+pub fn inside_bounds(position: [f64; 3], low: [i32; 3], high: [i32; 3]) -> bool {
+    let floors = [
+        position[0].floor() as i32,
+        position[1].floor() as i32,
+        position[2].floor() as i32,
+    ];
+    (low[0]..=high[0]).contains(&floors[0])
+        && (low[1]..=high[1]).contains(&floors[1])
+        && (low[2]..=high[2]).contains(&floors[2])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,5 +265,25 @@ mod tests {
         assert!(!self_damage_safe(20.0, 12.0, 0.0, true, 100.0));
         assert!(self_damage_safe(20.0, 12.0, 0.0, false, 100.0));
         assert!(!self_damage_safe(5.0, 12.0, 0.0, false, 4.0));
+    }
+
+    #[test]
+    fn a_position_just_outside_the_bounds_is_excluded() {
+        let (low, high) = explosion_bounds(6.0, [0.0; 3]);
+        assert_eq!(low, [-13; 3]);
+        assert_eq!(high, [13; 3]);
+        assert!(inside_bounds([13.9, -12.6, 0.0], low, high));
+        assert!(!inside_bounds([14.1, 0.0, 0.0], low, high));
+    }
+
+    #[test]
+    fn placement_prediction_resets() {
+        let mut prediction = Prediction {
+            attacked: true,
+            pending_remove: 7,
+        };
+        prediction.reset();
+        assert!(!prediction.attacked);
+        assert_eq!(prediction.pending_remove, -1);
     }
 }
