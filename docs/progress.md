@@ -2778,7 +2778,9 @@ The module's Normal/Hypixel mode definition is included. The runtime state
 lives in `src/core/bed_breaker_runtime.rs`: it keeps the target list across
 ticks, animates visibility, selects the last target inside the reticle,
 resolves/finishes the Hypixel cover and exposes the block, tool slot and
-server-rotation target. `cargo check --offline` passes. The host scan, the
+server-rotation target. Losing the reticle target clears `last_progress` and
+`server_rotation`, and Normal mode resets every cover phase so a mode switch
+cannot keep spoofing the old cover. `cargo check --offline` passes. The host scan, the
 reticle projection, the `Game::pick` mouse-over claim, the break
 rotation/movement fix and the indicator renderer are the next batch; the
 module is not registered yet.

@@ -65,7 +65,17 @@ impl BedBreaker {
             state.update_visibility_animation(now_ms);
         }
         self.selected = self.targets.iter().rposition(|state| state.inside_reticle);
-        let index = self.selected?;
+        let Some(index) = self.selected else {
+            self.last_progress = None;
+            self.server_rotation = None;
+            return None;
+        };
+        if mode == Mode::Normal {
+            // `onModeChanged` resets every render state when Hypixel is left.
+            for state in &mut self.targets {
+                state.reset_break_state();
+            }
+        }
         if mode == Mode::Hypixel {
             let state = &mut self.targets[index];
             if state.phase == BedBreakPhase::Unresolved {
@@ -87,7 +97,8 @@ impl BedBreaker {
             _ => (state.position.block(), None, state.phase),
         };
         self.last_progress = Some(index);
-        self.server_rotation = (phase == BedBreakPhase::Cover).then_some(block);
+        self.server_rotation =
+            (mode == Mode::Hypixel && phase == BedBreakPhase::Cover).then_some(block);
         Some(Target {
             bed: state.position.block(),
             block,
