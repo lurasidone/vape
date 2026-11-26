@@ -165,6 +165,28 @@ fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: boo
             pressed: true,
         });
     }
+    // AntiFireball's Stop movement holds the four movement keys up.
+    let held = with_client(&client, |runtime| {
+        runtime.anti_fireball_held_up([
+            view.key(Axis::Forward),
+            view.key(Axis::Back),
+            view.key(Axis::Left),
+            view.key(Axis::Right),
+        ])
+    });
+    for (axis, up) in [Axis::Forward, Axis::Back, Axis::Left, Axis::Right]
+        .into_iter()
+        .zip(held)
+    {
+        if up {
+            overrides.request(Request {
+                axis,
+                owner: Owner::AntiFireball,
+                priority: 2,
+                pressed: false,
+            });
+        }
+    }
     // JumpReset holds the jump key for the tick after our knockback landed.
     if active && with_client(&client, |runtime| runtime.jump_reset_key(again)) {
         overrides.request(Request {

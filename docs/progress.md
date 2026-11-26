@@ -2741,3 +2741,19 @@ signed SDK and launcher `0.2.108` (`native-f1bb66f-0b8365d4fc48`); the
 scenario is deferred with the rest of the module tests, per the user.
 Also removed the temporary `vape-rs parkour gate` logging from
 `vape_input_delays` (commit `ed73b3d`); no debug logging remains.
+
+## 2026-11-26: AntiFireball host path
+
+The module logic and its unit tests existed, but the native combat worker never
+called it. Added the host adapter in `vape_combat`: it builds the module's
+`Me`, `Body` and `Fireball` values from the local player, the entity snapshot
+and `game.creatures.projectiles` (large fireballs), finds the redirectable
+projectile under the view ray, and calls `Runtime::anti_fireball_tick` with a
+block clip. The returned view and managed rotation are applied to the game and
+the send boundary, and its click presses/releases `game.left`. The movement
+input writer now applies `anti_fireball_held_up` for Stop movement, and
+`movement_input_locked` includes `anti_fireball_locked`.
+
+Built through the signed Nov 22 SDK and launcher `0.2.108`:
+`native-f1bb66f-cad62a9c97a8`. This is compile/integration evidence; the host
+scenario is deferred with the rest of the module tests, as requested.

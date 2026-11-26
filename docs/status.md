@@ -76,7 +76,7 @@ Modules validated in a real game (83 module/client rows):
 - **Render:** Fullbright, Clear Water, Time Changer, Weather, AntiDebuff, ItemESP, NoHurtCam, NoClickDelay, NoJumpDelay, Inventory Blur, ESP, Tracers, NameTags, Search, SpawnerFinder, StorageESP, Trajectories, Projectiles, Arrows, Health, Explosions, Indicators, BedPlates, Block Overlay, PropHunt, MurdererFinder.
 - **HUD / client:** Armor Status, Potion Status, Coords, FPS, Compass, Clock, Keystrokes, Reach Display, Target Info, local toggle notifications, the GUI and config settings modules.
 
-Integrated, waiting for a full scenario on main: AimAssist, KillAura,
+Integrated, waiting for a full scenario on main: AntiFireball, AimAssist, KillAura,
 SilentAura, AutoArmor, AutoMace (Manual/Auto/Density/Breach modes
 validated), InventoryFill, Parkour, Blink, FakeLag, Scaffold (Legit
 validated; GodBridge 23/24 and TellyBridge 14/16 on the worker branch),
@@ -84,8 +84,7 @@ Freelook, Scoreboard (text replacement), Text GUI, the click GUI
 layout/search/favorites, friends/enemies, local profiles, macros, binds
 and the deterministic timing.
 
-Implemented core (logic and tests, host path incomplete): AntiFireball,
-HitFlick, the shared claim owners, session lifecycle, HUD drag/snap/scale and
+Implemented core (logic and tests, host path incomplete): HitFlick, the shared claim owners, session lifecycle, HUD drag/snap/scale and
 the typed setting editors.
 
 Not started: CrystalAura and its submodules, AutoAnchor, AutoLadder,

@@ -6,6 +6,8 @@ use crate::game::vape_current_support::{MotionWorldExt, PlayerMotionExt};
 use crate::game::vape_rs::core::{ModuleId, lifecycle::EntityHandle, with_client};
 use crate::game::vape_rs::inventory::item_limit::HeldItem;
 use crate::game::vape_rs::modules::combat::aim_assist::Frame;
+use crate::game::vape_rs::modules::combat::anti_fireball::{Aabb, Body, Fireball, Me, Tick};
+use horizon_client::projectiles::ProjectileKind;
 use crate::game::vape_rs::targeting::entities::{
     Bounds, EntityClass, EntityView, PlayerView, threat_score,
 };
@@ -782,6 +784,151 @@ pub(super) fn clickers(game: &mut Game<'_>) {
     }
 }
 
+fn vec3(v: horizon_core::geometry::Vec3) -> [f64; 3] {
+    [v.x, v.y, v.z]
+}
+
+fn body_aabb(bounds: horizon_core::geometry::Aabb) -> Aabb {
+    let (min, max) = (bounds.min_position(), bounds.max_position());
+    Aabb {
+        min: [min.x, min.y, min.z],
+        max: [max.x, max.y, max.z],
+    }
+}
+
+/// The redirectable projectile under the view ray, unless a block is nearer.
+fn crosshair_projectile(game: &Game<'_>) -> Option<i32> {
+    let (eye, dir) = game.aim()?;
+    let reach = game.entity_reach;
+    let block = game.pick().map(|hit| {
+        let d = [hit.point[0] - eye[0], hit.point[1] - eye[1], hit.point[2] - eye[2]];
+        (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt()
+    });
+    let mut best: Option<(i32, f64)> = None;
+    for projectile in &game.creatures.projectiles {
+        if !matches!(
+            projectile.kind,
+            ProjectileKind::LargeFireball { .. }
+                | ProjectileKind::SmallFireball
+                | ProjectileKind::DragonFireball
+                | ProjectileKind::WindCharge
+                | ProjectileKind::BreezeWindCharge
+        ) {
+            continue;
+        }
+        if let Some(t) = crate::game::ray_box(eye, dir, reach, projectile.bounds())
+            && block.is_none_or(|b| t < b)
+            && best.is_none_or(|(_, bt)| t < bt)
+        {
+            best = Some((projectile.id as i32, t));
+        }
+    }
+    best.map(|(id, _)| id)
+}
+
+/// Client tick HEAD: AntiFireball's rotation and attack, before the movement
+/// marks and the motion packet.
+fn anti_fireball(game: &mut Game<'_>) {
+    let client = crate::game::vape_rs::core::client().clone();
+    if !with_client(&client, |runtime| runtime.anti_fireball_wanted()) {
+        return;
+    }
+    let Some(player) = game.player.as_ref() else {
+        return;
+    };
+    let epoch = with_client(&client, |runtime| runtime.session().epoch());
+    let friends = with_client(&client, |runtime| runtime.friend_keys());
+    let me = Me {
+        id: player.entity_id,
+        position: vec3(player.position),
+        previous: vec3(game.previous_position),
+        eye_height: f64::from(player.dimensions.eye_height),
+        bounds: body_aabb(player.bounds()),
+        yaw: game.yaw,
+        pitch: game.pitch,
+    };
+    let bodies = snapshot(game, epoch, None)
+        .into_iter()
+        .map(|entity| {
+            let player = entity.class == EntityClass::Player;
+            let valid_owner =
+                !player || !friends.iter().any(|f| f.eq_ignore_ascii_case(&entity.name));
+            Body {
+                id: entity.handle.id,
+                position: entity.position,
+                bounds: Aabb {
+                    min: entity.bounds.min,
+                    max: entity.bounds.max,
+                },
+                player,
+                valid_owner,
+            }
+        })
+        .collect();
+    let fireballs = game
+        .creatures
+        .projectiles
+        .iter()
+        .filter_map(|projectile| {
+            if !matches!(projectile.kind, ProjectileKind::LargeFireball { .. }) {
+                return None;
+            }
+            let size = projectile.kind.size();
+            Some(Fireball {
+                id: projectile.id as i32,
+                position: vec3(projectile.position),
+                previous: vec3(projectile.previous),
+                velocity: vec3(projectile.velocity),
+                acceleration: projectile.acceleration,
+                age: projectile.age,
+                width: size,
+                height: size,
+            })
+        })
+        .collect();
+    let crosshair = crosshair_projectile(game);
+    let mut tick = Tick {
+        me,
+        bodies,
+        fireballs,
+        focused: game.focused,
+        blocked_by_screen: game.screen != Screen::Playing,
+        screen_open: game.screen != Screen::Playing,
+        attack_down: game.left,
+        crosshair,
+        sensitivity: f64::from(game.settings.sensitivity),
+        managed: None,
+        managed_returning: false,
+    };
+    let effects = {
+        let mut clip = |from: [f64; 3], to: [f64; 3]| {
+            let d = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
+            let length = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt();
+            if length <= 1.0e-9 {
+                return None;
+            }
+            game.clip_ray(from, [d[0] / length, d[1] / length, d[2] / length], length)
+                .map(|hit| hit.point)
+        };
+        with_client(&client, |runtime| {
+            runtime.anti_fireball_tick(&mut tick, &mut clip)
+        })
+    };
+    if let Some((yaw, pitch)) = effects.view {
+        game.yaw = yaw;
+        game.pitch = pitch;
+    }
+    if let Some(sent) = effects.sent {
+        crate::game::remote::vape_combat_remote::set_rotation(sent);
+    }
+    if effects.release_attack {
+        game.left = false;
+    }
+    if effects.press_attack {
+        game.left = true;
+    }
+}
+
 /// Client tick HEAD: the clickers' jitter step, Fly's (else LongJump's or
 /// Speed's) move, AntiFall's lagback and NoSlowdown's mark for this tick's
 /// player move.
@@ -793,6 +940,7 @@ pub(super) fn movement_tick(game: &mut Game<'_>) {
     if game.player.is_none() {
         return;
     }
+    anti_fireball(game);
     let active = playing(game);
     let key = |k: KeyCode| game.keys.raw(&k);
     let axis = |plus: KeyCode, minus: KeyCode| {

@@ -297,7 +297,7 @@ impl Runtime {
 
     /// `SharedModuleControlClaims.movementInput.isLocked()`.
     pub fn movement_input_locked(&self) -> bool {
-        self.world_movement.claims.movement
+        self.world_movement.claims.movement || self.anti_fireball_locked()
     }
 
     /// `SharedModuleControlClaims.rightClickUse.isClaimed()`.
