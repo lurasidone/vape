@@ -2658,3 +2658,18 @@ the control again lost **7.5** health (20.0 -> 12.5), while AntiCheat at the
 same height kept **20.0**; both landed at `y=101` and quit cleanly. This
 validates both NoFall modes on the remote path; the other gameplay features
 still need their own host scenarios.
+
+Rebuilt after tightening the send helper: the ground claim is now taken only
+inside the `MovePlayerPos`, `MovePlayerPosRot` and `MovePlayerRot` arms, so a
+`PlayerInput` or `PlayerCommand` packet sent earlier in the same tick cannot
+consume it. The same helper now rewrites the yaw/pitch of the two rotation
+packets from `vape_combat_remote::rotation`, restoring the old
+`send-state-rotation` claim at the send boundary. Build
+`native-f1bb66f-dfa18fbf482a` reported `Your mods are built`. Re-ran the LAN
+fall with the guest holding W so a `PlayerInput` packet precedes the position
+packet, on a 41x41 stone platform at
+`target/scenarios/sdk-nofall-input-wzm8tn4f/`: without NoFall the guest lost
+**7.0** health (20.0 -> 13.0); with NoFall Normal it stayed **20.0**. Both
+landed at `y=101` with `on_ground=true`, `z` about 16.6, and quit cleanly.
+The managed-rotation rewrite compiles in the same helper but still needs a
+combat scenario to prove the server sees the aimed rotation.
