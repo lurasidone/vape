@@ -2729,3 +2729,15 @@ not change the result and was reverted. Tried focusing a visible launch with
 (`xdotool search --onlyvisible` returned nothing), so the focus gate cannot be
 satisfied from this session. The visible focused-window `NativeSession` path
 is required for these modules; no module code changed.
+
+## 2026-11-26: locally thrown heal potions and debug cleanup
+
+`launch_thrown` no longer exists on the signed Nov 22 SDK, so the local
+thrown-potion count moved into the existing `use_potion_item` hook:
+`target_info_pot_use` now calls `target_heal_joined` for a splash or
+lingering potion and `target_heal_used` for a drink. This restores the
+`target-info-pot-launch` behavior without a separate target. Built with the
+signed SDK and launcher `0.2.108` (`native-f1bb66f-0b8365d4fc48`); the
+scenario is deferred with the rest of the module tests, per the user.
+Also removed the temporary `vape-rs parkour gate` logging from
+`vape_input_delays` (commit `ed73b3d`); no debug logging remains.

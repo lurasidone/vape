@@ -137,13 +137,6 @@ fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: boo
             runtime.movement().user(Axis::Jump, &view),
         )
     });
-    if with_client(&client, |runtime| runtime.enabled(ModuleId::Parkour)) {
-        log::info!(
-            "vape-rs parkour gate focused={} screen={:?} active={active} parkour={parkour} forward={forward} jump={jump}",
-            game.focused,
-            game.screen
-        );
-    }
     let mut overrides = Overrides::default();
     if sprint {
         overrides.request(Request {
