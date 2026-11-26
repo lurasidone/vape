@@ -260,6 +260,7 @@ enum Hit {
     RulesNewPreset,
     RulesKind,
     RulesRemoveCondition(usize),
+    RulesConditionOp(usize),
     RulesAdd,
     RulesRemove(usize),
     RulesCycle(usize),
@@ -1216,7 +1217,21 @@ mod tests {
         assert_eq!(presets[0].groups[0].conditions.len(), 1);
         assert_eq!(
             rules_editor::summary(&presets[0].groups[0].conditions[0]),
-            "Quantity >= 2"
+            "Quantity greater or equal to 2"
+        );
+        // A condition row click cycles its comparison.
+        gui.frame(&view, (400.0, 300.0));
+        let op = centre(&gui, &|hit| matches!(hit, Hit::RulesConditionOp(0)));
+        let actions = click(&mut gui, &view, op);
+        let [Action::Set(id, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        assert_eq!(id, rules_editor::PRESETS);
+        view.values[rules_editor::PRESETS] = value.clone();
+        let presets = parse_presets(value.as_str().unwrap()).unwrap();
+        assert_eq!(
+            rules_editor::summary(&presets[0].groups[0].conditions[0]),
+            "Quantity less than 2"
         );
         // The new preset stays selected, so the ITEMS tab's new rule
         // attaches it; the preset hint cycles it off and back on.
@@ -1307,6 +1322,59 @@ mod tests {
             gui.rules_editor.as_ref().unwrap().profile,
             "Inventory #1"
         );
+    }
+
+    #[test]
+    fn invalid_profiles_text_is_not_overwritten_by_the_editor() {
+        let mut gui = Gui {
+            open: true,
+            ..Gui::default()
+        };
+        let mut view = view();
+        view.values = json!({
+            "client.search-bar": "Integrated",
+            rules_editor::PROFILES: "{broken",
+            rules_editor::PRESETS: "[]",
+        });
+        view.modules.push(ModuleView {
+            id: "inventory.inventory-manager".into(),
+            name: "InventoryManager".into(),
+            category: "Inventory".into(),
+            enabled: true,
+            favorite: false,
+            visible: true,
+        });
+        view.definitions = vec![
+            Definition::new(
+                rules_editor::PROFILES,
+                "Inventory",
+                Kind::Text { max_chars: 4096 },
+                json!(""),
+            ),
+            Definition::new(
+                rules_editor::PRESETS,
+                "Presets",
+                Kind::Text { max_chars: 4096 },
+                json!("[]"),
+            ),
+        ];
+        click(&mut gui, &view, (30.0, 6.0 + NAV_HEADER_HEIGHT + 4.0 * ROW_HEIGHT + 10.0));
+        gui.selected = Some("inventory.inventory-manager".into());
+        gui.frame(&view, (400.0, 300.0));
+        let open = centre(&gui, &|hit| matches!(hit, Hit::RulesOpen));
+        let actions = click(&mut gui, &view, open);
+        assert!(actions.is_empty(), "{actions:?}");
+        assert!(gui.rules_editor.is_none());
+        assert!(gui.status.contains("Invalid inventory profiles"));
+        // An unparsable presets setting blocks the editor too.
+        view.values[rules_editor::PROFILES] = r#"[{"name":"Kept"}]"#.into();
+        view.values[rules_editor::PRESETS] = "{broken".into();
+        gui.frame(&view, (400.0, 300.0));
+        let open = centre(&gui, &|hit| matches!(hit, Hit::RulesOpen));
+        let actions = click(&mut gui, &view, open);
+        assert!(actions.is_empty(), "{actions:?}");
+        assert!(gui.rules_editor.is_none());
+        assert!(gui.status.contains("Invalid inventory profiles"));
     }
 
     #[test]

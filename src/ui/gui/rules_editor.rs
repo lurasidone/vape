@@ -133,16 +133,94 @@ fn unprefixed(id: &str) -> String {
 /// A one-line description of a saved condition for the preset list.
 pub fn summary(condition: &Condition) -> String {
     match condition {
-        Condition::Durability { value, .. } => format!("Durability >= {value}%"),
-        Condition::AttackDamage { value, .. } => format!("Attack damage >= {value}"),
-        Condition::Enchantment { enchantment, .. } => format!("Has {enchantment}"),
-        Condition::PotionEffect { effect, .. } => format!("Has {effect}"),
-        Condition::Quantity { amount, .. } => format!("Quantity >= {amount}"),
-        Condition::DisplayName { texts, .. } => format!("Display name: {}", texts.join(", ")),
-        Condition::ItemName { texts, .. } => format!("Item name: {}", texts.join(", ")),
-        Condition::Lore { texts, .. } => format!("Lore: {}", texts.join(", ")),
-        Condition::Material { items, .. } => format!("Material: {}", items.join(", ")),
+        Condition::Durability {
+            percentage,
+            operator,
+            value,
+        } => format!(
+            "Durability {} {value}{}",
+            operator.name(),
+            if *percentage { "%" } else { "" }
+        ),
+        Condition::AttackDamage { operator, value } => {
+            format!("Attack damage {} {value}", operator.name())
+        }
+        Condition::Enchantment {
+            level_mode,
+            enchantment,
+            operator,
+            level,
+        } => {
+            if *level_mode {
+                format!("{enchantment} {} {level}", operator.name())
+            } else {
+                format!("Has {enchantment}")
+            }
+        }
+        Condition::PotionEffect {
+            mode,
+            effect,
+            operator,
+            value,
+        } => match mode {
+            EffectMode::Has => format!("Has {effect}"),
+            EffectMode::Level => format!("{effect} level {} {value}", operator.name()),
+            EffectMode::Duration => format!("{effect} duration {} {value}", operator.name()),
+        },
+        Condition::Quantity { operator, amount } => {
+            format!("Quantity {} {amount}", operator.name())
+        }
+        Condition::DisplayName { mode, texts } => {
+            format!("Display name {} {}", mode.name(), texts.join(", "))
+        }
+        Condition::ItemName { mode, texts } => {
+            format!("Item name {} {}", mode.name(), texts.join(", "))
+        }
+        Condition::Lore { mode, texts } => {
+            format!("Lore {} {}", mode.name(), texts.join(", "))
+        }
+        Condition::Material { include, items } => format!(
+            "Material {} {}",
+            if *include { "is in" } else { "is not in" },
+            items.join(", ")
+        ),
     }
+}
+
+/// Cycles a condition's comparison: numeric operators, text modes or the
+/// material include flag.
+pub fn cycle_operator(presets: &mut [Preset], editor: &RulesEditor, index: usize) -> bool {
+    let Some(condition) = editor
+        .selected_preset_mut(presets)
+        .and_then(|p| p.groups.first_mut())
+        .and_then(|g| g.conditions.get_mut(index))
+    else {
+        return false;
+    };
+    match condition {
+        Condition::Durability { operator, .. }
+        | Condition::AttackDamage { operator, .. }
+        | Condition::Enchantment { operator, .. }
+        | Condition::PotionEffect { operator, .. }
+        | Condition::Quantity { operator, .. } => {
+            let i = Compare::ALL
+                .iter()
+                .position(|c| c == operator)
+                .unwrap_or(0);
+            *operator = Compare::ALL[(i + 1) % Compare::ALL.len()];
+        }
+        Condition::DisplayName { mode, .. }
+        | Condition::ItemName { mode, .. }
+        | Condition::Lore { mode, .. } => {
+            let i = TextMode::ALL
+                .iter()
+                .position(|m| m == mode)
+                .unwrap_or(0);
+            *mode = TextMode::ALL[(i + 1) % TextMode::ALL.len()];
+        }
+        Condition::Material { include, .. } => *include = !*include,
+    }
+    true
 }
 
 #[derive(Clone, Debug)]
@@ -255,18 +333,34 @@ pub fn default_profile() -> Profile {
     }
 }
 
-/// Parses the `profiles` setting with the `presets` setting's shared rules.
-pub fn profiles(view: &View) -> Vec<Profile> {
-    parse_profiles(
-        view.values[PROFILES].as_str().unwrap_or_default(),
-        &presets(view),
-    )
-    .unwrap_or_default()
+/// Parses the `profiles` setting with the `presets` setting's shared rules,
+/// reporting invalid text instead of treating it as empty.
+pub fn parse(view: &View) -> Result<Vec<Profile>, String> {
+    let text = view.values[PROFILES].as_str().unwrap_or_default();
+    if text.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    parse_profiles(text, &parse_presets_setting(view)?)
 }
 
-/// Parses the `presets` setting.
+/// Parses the `presets` setting, reporting invalid text.
+pub fn parse_presets_setting(view: &View) -> Result<Vec<Preset>, String> {
+    let text = view.values[PRESETS].as_str().unwrap_or_default();
+    if text.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    parse_presets(text)
+}
+
+/// The display view of the profiles; invalid text shows as none and the
+/// mutation paths use `parse` so they never overwrite it.
+pub fn profiles(view: &View) -> Vec<Profile> {
+    parse(view).unwrap_or_default()
+}
+
+/// The display view of the presets.
 pub fn presets(view: &View) -> Vec<Preset> {
-    parse_presets(view.values[PRESETS].as_str().unwrap_or_default()).unwrap_or_default()
+    parse_presets_setting(view).unwrap_or_default()
 }
 
 /// Serializes the profiles back into the setting's JSON array.
@@ -476,7 +570,9 @@ mod tests {
         add_condition(&mut presets, &editor).unwrap();
         let group = &presets[0].groups[0];
         assert_eq!(group.conditions.len(), 2);
-        assert_eq!(summary(&group.conditions[0]), "Quantity >= 2");
+        assert_eq!(summary(&group.conditions[0]), "Quantity greater or equal to 2");
+        assert!(cycle_operator(&mut presets, &editor, 0));
+        assert_eq!(summary(&presets[0].groups[0].conditions[0]), "Quantity less than 2");
         assert!(remove_condition(&mut presets, &editor, 1));
         assert_eq!(presets[0].groups[0].conditions.len(), 1);
         // The rule's custom rule is the selected preset's uuid.

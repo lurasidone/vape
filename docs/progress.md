@@ -3171,14 +3171,20 @@ integrated/unit-tested, not host-validated.
 The editor's PRESETS tab creates a preset (a unique uuid, "Rule #n"), lists its
 first AND group's conditions and adds one from a kind (durability, attack
 damage, enchantment, potion effect, quantity, display/item name, material,
-lore) with one value and the common comparison (greater-or-equal for numbers,
-contains for text, a material list). The cross removes a condition. The item
+lore) with one value; clicking a condition row cycles its comparison (the six
+numeric operators, the eight text modes, or the material include flag). The
+cross removes a condition. The item
 tab's preset hint cycles the custom rule (None and each preset); a new rule
 references the selected preset by uuid, resolved from the presets setting. The
 reference's operators, several texts and multiple AND/OR groups remain. Opening
 the editor with the default empty profiles setting creates the reference's
-"Inventory #1" profile, so the editor is usable from a fresh config.
-`cargo test --offline --lib` passes 512 tests (the preset model, the rule's
-custom-rule uuid round-trip and the click-GUI NEW/KIND/ADD/preset paths). The
+"Inventory #1" profile, so the editor is usable from a fresh config. Only a
+truly empty profiles/presets text is replaced; a text the model cannot parse
+sets an "Invalid inventory profiles/presets" status and no mutation writes the
+setting (the open guard and every add/remove/cycle path parse fallibly), so a
+hand-edited or imported filter is never silently overwritten.
+`cargo test --offline --lib` passes 513 tests (the preset model, the operator
+cycle, the rule's custom-rule uuid round-trip, the click-GUI
+NEW/KIND/ADD/operator/preset paths and the invalid-text preservation). The
 host build remains blocked (the horizon-rust 404 and the older xtask source
 pin), so this is implemented-core/unit-tested, not host-validated.

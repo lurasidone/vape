@@ -1620,6 +1620,10 @@ impl Gui {
                         FIELD_SCALE,
                         Align::Left,
                     );
+                    l.hit(
+                        Rect(row.0, row.1, row.2 - 16.0, row.3),
+                        Hit::RulesConditionOp(i),
+                    );
                     l.icon(row.0 + row.2 - 8.0, row.1 + 4.5, 1.0, &CROSS, MUTED);
                     l.hit(
                         Rect(row.0 + row.2 - 14.0, row.1, 14.0, row.3),

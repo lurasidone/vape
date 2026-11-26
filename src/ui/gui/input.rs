@@ -337,6 +337,7 @@ impl Gui {
                     | Hit::RulesNewPreset
                     | Hit::RulesKind
                     | Hit::RulesRemoveCondition(_)
+                    | Hit::RulesConditionOp(_)
                     | Hit::RulesAction
                     | Hit::Popup
                     | Hit::Focus(..)
@@ -694,15 +695,24 @@ impl Gui {
                 return vec![Action::Set(id, map_value(&entries))];
             }
             Hit::RulesOpen => {
-                let mut profiles = rules_editor::profiles(view);
-                self.rules_editor = Some(rules_editor::RulesEditor::new(&profiles));
-                if profiles.is_empty() {
-                    profiles.push(rules_editor::default_profile());
+                let text = view.values[rules_editor::PROFILES]
+                    .as_str()
+                    .unwrap_or_default();
+                if text.trim().is_empty() {
+                    let profiles = vec![rules_editor::default_profile()];
                     self.rules_editor = Some(rules_editor::RulesEditor::new(&profiles));
                     return vec![Action::Set(
                         rules_editor::PROFILES.into(),
                         json!(rules_editor::text(&profiles)),
                     )];
+                }
+                match rules_editor::parse(view) {
+                    Ok(profiles) => {
+                        self.rules_editor = Some(rules_editor::RulesEditor::new(&profiles))
+                    }
+                    Err(message) => {
+                        self.status = format!("Invalid inventory profiles: {message}")
+                    }
                 }
             }
             Hit::RulesClose => self.rules_editor = None,
@@ -723,7 +733,13 @@ impl Gui {
                 }
             }
             Hit::RulesPreset => {
-                let presets = rules_editor::presets(view);
+                let presets = match rules_editor::parse_presets_setting(view) {
+                    Ok(presets) => presets,
+                    Err(message) => {
+                        self.status = format!("Invalid inventory presets: {message}");
+                        return Vec::new();
+                    }
+                };
                 if let Some(editor) = self.rules_editor.as_mut() {
                     editor.cycle_preset(&presets);
                 }
@@ -735,7 +751,14 @@ impl Gui {
             }
             Hit::RulesNewPreset => {
                 if let Some(mut editor) = self.rules_editor.take() {
-                    let mut presets = rules_editor::presets(view);
+                    let mut presets = match rules_editor::parse_presets_setting(view) {
+                        Ok(presets) => presets,
+                        Err(message) => {
+                            self.status = format!("Invalid inventory presets: {message}");
+                            self.rules_editor = Some(editor);
+                            return Vec::new();
+                        }
+                    };
                     rules_editor::add_preset(&mut presets, &mut editor);
                     self.rules_editor = Some(editor);
                     return vec![Action::Set(
@@ -751,10 +774,37 @@ impl Gui {
             }
             Hit::RulesRemoveCondition(index) => {
                 if let Some(editor) = self.rules_editor.take() {
-                    let mut presets = rules_editor::presets(view);
+                    let mut presets = match rules_editor::parse_presets_setting(view) {
+                        Ok(presets) => presets,
+                        Err(message) => {
+                            self.status = format!("Invalid inventory presets: {message}");
+                            self.rules_editor = Some(editor);
+                            return Vec::new();
+                        }
+                    };
                     let removed = rules_editor::remove_condition(&mut presets, &editor, index);
                     self.rules_editor = Some(editor);
                     if removed {
+                        return vec![Action::Set(
+                            rules_editor::PRESETS.into(),
+                            json!(rules_editor::presets_text(&presets)),
+                        )];
+                    }
+                }
+            }
+            Hit::RulesConditionOp(index) => {
+                if let Some(editor) = self.rules_editor.take() {
+                    let mut presets = match rules_editor::parse_presets_setting(view) {
+                        Ok(presets) => presets,
+                        Err(message) => {
+                            self.status = format!("Invalid inventory presets: {message}");
+                            self.rules_editor = Some(editor);
+                            return Vec::new();
+                        }
+                    };
+                    let cycled = rules_editor::cycle_operator(&mut presets, &editor, index);
+                    self.rules_editor = Some(editor);
+                    if cycled {
                         return vec![Action::Set(
                             rules_editor::PRESETS.into(),
                             json!(rules_editor::presets_text(&presets)),
@@ -770,7 +820,14 @@ impl Gui {
             Hit::RulesAdd => {
                 if let Some(mut editor) = self.rules_editor.take() {
                     if editor.tab == rules_editor::Tab::Presets {
-                        let mut presets = rules_editor::presets(view);
+                        let mut presets = match rules_editor::parse_presets_setting(view) {
+                            Ok(presets) => presets,
+                            Err(message) => {
+                                self.status = format!("Invalid inventory presets: {message}");
+                                self.rules_editor = Some(editor);
+                                return Vec::new();
+                            }
+                        };
                         match rules_editor::add_condition(&mut presets, &editor) {
                             Ok(()) => {
                                 editor.item.clear();
@@ -787,11 +844,26 @@ impl Gui {
                             }
                         }
                     }
-                    let mut profiles = rules_editor::profiles(view);
+                    let mut profiles = match rules_editor::parse(view) {
+                        Ok(profiles) => profiles,
+                        Err(message) => {
+                            self.status = format!("Invalid inventory profiles: {message}");
+                            self.rules_editor = Some(editor);
+                            return Vec::new();
+                        }
+                    };
+                    let presets = match rules_editor::parse_presets_setting(view) {
+                        Ok(presets) => presets,
+                        Err(message) => {
+                            self.status = format!("Invalid inventory presets: {message}");
+                            self.rules_editor = Some(editor);
+                            return Vec::new();
+                        }
+                    };
                     let result = if editor.tab == rules_editor::Tab::Slots {
                         rules_editor::set_slot(&mut profiles, &editor)
                     } else {
-                        rules_editor::add(&mut profiles, &rules_editor::presets(view), &editor)
+                        rules_editor::add(&mut profiles, &presets, &editor)
                     };
                     match result {
                         Ok(()) => {
@@ -811,7 +883,14 @@ impl Gui {
             }
             Hit::RulesRemove(index) => {
                 if let Some(editor) = self.rules_editor.take() {
-                    let mut profiles = rules_editor::profiles(view);
+                    let mut profiles = match rules_editor::parse(view) {
+                        Ok(profiles) => profiles,
+                        Err(message) => {
+                            self.status = format!("Invalid inventory profiles: {message}");
+                            self.rules_editor = Some(editor);
+                            return Vec::new();
+                        }
+                    };
                     let removed = rules_editor::remove(&mut profiles, &editor, index);
                     self.rules_editor = Some(editor);
                     if removed {
@@ -824,7 +903,14 @@ impl Gui {
             }
             Hit::RulesCycle(index) => {
                 if let Some(editor) = self.rules_editor.take() {
-                    let mut profiles = rules_editor::profiles(view);
+                    let mut profiles = match rules_editor::parse(view) {
+                        Ok(profiles) => profiles,
+                        Err(message) => {
+                            self.status = format!("Invalid inventory profiles: {message}");
+                            self.rules_editor = Some(editor);
+                            return Vec::new();
+                        }
+                    };
                     let cycled = rules_editor::cycle(&mut profiles, &editor, index);
                     self.rules_editor = Some(editor);
                     if cycled {
