@@ -2975,6 +2975,15 @@ rotation at the Hypixel cover centre when the module's `server_rotation` is
 set (released otherwise). `cargo check --offline` and the native build
 (`native-f1bb66f-5200d043cad6`) pass. The movement-key remap remains.
 
+## 2026-11-26: BedBreaker remap base and CrystalAura target
+
+The movement remap now uses the view the silent rotation started from (the
+reference's `savedMovementFixYaw`) rather than `game.yaw`, which `pre_motion`
+already moved; the duplicate angle helper is gone. The CrystalAura target
+state ledger (state/action/candidate/prediction, the explosion bounds) ports
+with two more tests (8 total). cargo check and the native build
+(`native-f1bb66f-a10c59b10ad4`) pass.
+
 ## 2026-11-26: CrystalAura decision types
 
 The action/state enums, the action candidate, the attack prediction and the

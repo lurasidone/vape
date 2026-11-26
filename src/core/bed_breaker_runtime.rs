@@ -13,6 +13,9 @@ pub struct BedBreaker {
     last_progress: Option<usize>,
     /// The cover block the Hypixel server rotation points at.
     server_rotation: Option<[i32; 3]>,
+    /// The host view and target angles the silent rotation was set with, so
+    /// the movement remap uses the view from before `managed_view` moved it.
+    rotation: Option<((f32, f32), (f32, f32))>,
     /// The target the host acts on, from the last tick.
     target: Option<Target>,
 }
@@ -36,6 +39,7 @@ impl BedBreaker {
         self.selected = None;
         self.last_progress = None;
         self.server_rotation = None;
+        self.rotation = None;
         self.target = None;
     }
 
@@ -159,5 +163,12 @@ impl BedBreaker {
     }
     pub fn server_rotation(&self) -> Option<[i32; 3]> {
         self.server_rotation
+    }
+    pub fn set_rotation(&mut self, view: (f32, f32), target: (f32, f32)) {
+        self.rotation = Some((view, target));
+    }
+    /// The view the silent rotation started from and its target angles.
+    pub fn rotation(&self) -> Option<((f32, f32), (f32, f32))> {
+        self.rotation
     }
 }

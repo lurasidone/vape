@@ -98,17 +98,6 @@ pub(crate) fn host_view(game: &crate::game::Game<'_>) -> HostView {
     }
 }
 
-/// The yaw/pitch from an eye to a block centre, in the game's convention.
-fn bed_angles(eye: [f64; 3], target: [f64; 3]) -> (f32, f32) {
-    let dx = target[0] - eye[0];
-    let dy = target[1] - eye[1];
-    let dz = target[2] - eye[2];
-    (
-        (-dx).atan2(dz).to_degrees() as f32,
-        (-dy).atan2((dx * dx + dz * dz).sqrt()).to_degrees() as f32,
-    )
-}
-
 fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: bool) {
     let client = crate::game::vape_rs::core::client().clone();
     // A socket key's release is seen at its release event (adapters/input.rs).
@@ -150,22 +139,13 @@ fn resolve_movement(game: &mut crate::game::Game<'_>, requests: bool, again: boo
     });
     let mut overrides = Overrides::default();
     // BedBreaker's Hypixel server rotation: press the keys the rotated view
-    // needs, as the reference's onPreLocalPlayerTick does.
-    if let Some(block) = with_client(&client, |runtime| runtime.bed_breaker_server_rotation())
-        && let Some(player) = game.player.as_ref()
+    // needs, as the reference's onPreLocalPlayerTick does. The base is the
+    // view the silent rotation started from (the reference's
+    // `savedMovementFixYaw`), not `game.yaw`, which `pre_motion` already
+    // moved to the managed rotation.
+    if let Some((view, target)) = with_client(&client, |runtime| runtime.bed_breaker_rotation())
     {
-        let eye = [
-            player.position.x,
-            player.position.y + f64::from(player.dimensions.eye_height),
-            player.position.z,
-        ];
-        let target = [
-            f64::from(block[0]) + 0.5,
-            f64::from(block[1]) + 0.5,
-            f64::from(block[2]) + 0.5,
-        ];
-        let (yaw, _) = bed_angles(eye, target);
-        let radians = (yaw - game.yaw).rem_euclid(360.0).to_radians();
+        let radians = (target.0 - view.0).rem_euclid(360.0).to_radians();
         let forward = radians.cos();
         let left = -radians.sin();
         for (axis, press) in [

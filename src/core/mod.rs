@@ -649,6 +649,7 @@ impl Runtime {
         rotation_runtime::Shared::of(&mut self.combat, &mut self.rotations).managed(view)
     }
     pub fn set_bed_breaker_rotation(&mut self, view: (f32, f32), target: (f32, f32)) {
+        self.bed_breaker.set_rotation(view, target);
         rotation_runtime::Shared::of(&mut self.combat, &mut self.rotations).silent(
             Claimant::BedBreaker,
             view,
@@ -670,6 +671,10 @@ impl Runtime {
     }
     pub fn bed_breaker_server_rotation(&self) -> Option<[i32; 3]> {
         self.bed_breaker.server_rotation()
+    }
+    /// The host view and target angles of the bed rotation.
+    pub fn bed_breaker_rotation(&self) -> Option<((f32, f32), (f32, f32))> {
+        self.bed_breaker.rotation()
     }
     pub fn set_enabled(&mut self, module: ModuleId, enabled: bool) {
         if module == ModuleId::Panic {

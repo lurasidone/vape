@@ -1,8 +1,8 @@
-//! CrystalAura's explosion math and block helpers (reference `CrystalAura`).
-//!
-//! The reference's placement/target submodules run on top of these: the
-//! damage model decides whether a placement or break is safe, and the
-//! interaction point is the ray the rotation aims at.
+// CrystalAura's explosion math and block helpers (reference `CrystalAura`).
+//
+// The reference's placement/target submodules run on top of these: the
+// damage model decides whether a placement or break is safe, and the
+// interaction point is the ray the rotation aims at.
 
 /// The reference's `ExplosionType` powers.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -237,6 +237,65 @@ pub fn inside_bounds(position: [f64; 3], low: [i32; 3], high: [i32; 3]) -> bool 
         && (low[2]..=high[2]).contains(&floors[2])
 }
 
+/// The reference's `CrystalAuraTargetSubModule` state ledger: the target
+/// block, the tracked crystal and the carried slot.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Target {
+    pub state: State,
+    pub block: Option<[i32; 3]>,
+    pub tracked: Option<i32>,
+    pub crystal_slot: i32,
+    pub saved_slot: i32,
+    pub prediction: Prediction,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::Idle
+    }
+}
+
+impl Target {
+    pub fn new() -> Self {
+        Self {
+            state: State::Idle,
+            block: None,
+            tracked: None,
+            crystal_slot: -1,
+            saved_slot: -1,
+            prediction: Prediction::default(),
+        }
+    }
+
+    /// The reference's `setState`: reset the per-state fields on entry and
+    /// drop the target on returning to idle.
+    pub fn set_state(&mut self, state: State) {
+        if self.state == state {
+            return;
+        }
+        self.state = state;
+        if state == State::Idle {
+            self.block = None;
+            self.tracked = None;
+            self.crystal_slot = -1;
+        }
+    }
+
+    /// The reference's `clearTracking`.
+    pub fn reset(&mut self) {
+        *self = Self::new();
+    }
+
+    /// The reference's `handlePlacingCrystal` entry: an existing crystal
+    /// above the base moves the state to breaking instead of placing.
+    pub fn placement_result(&self, existing_crystal: Option<i32>) -> (State, Option<i32>) {
+        match existing_crystal {
+            Some(id) => (State::BreakingCrystal, Some(id)),
+            None => (State::PlacingCrystal, None),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,5 +344,28 @@ mod tests {
         prediction.reset();
         assert!(!prediction.attacked);
         assert_eq!(prediction.pending_remove, -1);
+    }
+
+    #[test]
+    fn an_existing_crystal_switches_to_breaking() {
+        let mut target = Target::new();
+        target.block = Some([1, 2, 3]);
+        target.set_state(State::PlacingCrystal);
+        assert_eq!(
+            target.placement_result(Some(9)),
+            (State::BreakingCrystal, Some(9))
+        );
+        assert_eq!(target.placement_result(None), (State::PlacingCrystal, None));
+    }
+
+    #[test]
+    fn returning_to_idle_drops_the_target() {
+        let mut target = Target::new();
+        target.block = Some([1, 2, 3]);
+        target.tracked = Some(9);
+        target.set_state(State::BreakingCrystal);
+        target.set_state(State::Idle);
+        assert!(target.block.is_none() && target.tracked.is_none());
+        assert_eq!(target.crystal_slot, -1);
     }
 }
