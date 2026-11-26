@@ -29,8 +29,10 @@ edits the profile's item rules, hotbar slot filters and preset conditions
 (AND groups, OR across them; comma-split text entries) on the same
 `Profile`/`Rule`/`Preset` JSON; the field's matcher picker lists the registered
 matchers by group and a text condition's entries edit as individual rows;
-514 lib tests pass; the host build was blocked this session), while the
-reference's item-specific picker classes are not ported.
+514 lib tests pass; the full host build compiles as
+`native-f1bb66f-67339950f43e` via the launcher and the SDK mirror, and the GUI
+opens in the HUD scenario, whose click coordinates are still the old pin's),
+while the reference's item-specific picker classes are not ported.
 `validated` always means a
 passing fresh-home host scenario with evidence in docs/evidence;
 `integrated` means hooked and running in the host without a full scenario.

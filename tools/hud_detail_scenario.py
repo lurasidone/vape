@@ -23,7 +23,7 @@ def run(resources):
                                    'hud.fps.y': 112, 'hud.compass.x': 46, 'hud.compass.y': 180,
                                    'hud.compass.binds': ['KeyC'],
                                    # The control socket has no right-shift alias.
-                                   'client.gui.binds': ['LeftShift']}})
+                                   'client.gui.binds': ['ShiftLeft']}})
         session.launch()
         for yaw, label in [(-180, 'north'), (-90, 'east'), (0, 'south'), (90, 'west')]:
             session.call('look', str(yaw), '0')
@@ -39,13 +39,13 @@ def run(resources):
         # HUD modules are listed by name in the HUD editor's centred frame.
         session.call('click-at', '107', '232')
         session.capture('legit-modules')
-        session.call('click-at', '190', '96')  # Compass
+        session.call('click-at', '190', '86')  # Compass, third HUD row
         session.capture('compass-enabled-in-gui')
         assert session.saved()['modules']['hud.compass']['enabled'] is True
-        session.call('click-at', '247', '116')  # Coords dots expand its settings
+        session.call('click-at', '247', '46')  # Coords dots expand its settings
         session.capture('coordinate-settings')
-        session.call('click-at', '200', '207')  # Display Type, fifth setting
-        session.call('click-at', '180', '223')  # horizontal, first option
+        session.call('click-at', '200', '65')  # Display Type, first setting
+        session.call('click-at', '180', '95')  # horizontal, second option
         session.capture('horizontal-selected')
         assert session.saved()['settings']['hud.coordinates.display'] == 'horizontal'
         session.call('click-at', '26', '287')  # BACK

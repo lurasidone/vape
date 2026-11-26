@@ -1884,7 +1884,7 @@ impl Gui {
             );
         }
         if editor.picker {
-            use crate::inventory::rules::{Group, Matcher};
+            use super::super::super::inventory::rules::{Group, Matcher};
             let list = Rect(panel.0 + 8.0, panel.1 + 36.0, panel.2 - 16.0, panel.3 - 70.0);
             l.rounded(
                 Rect(list.0 - 0.5, list.1 - 0.5, list.2 + 1.0, list.3 + 1.0),

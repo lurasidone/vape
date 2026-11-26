@@ -264,7 +264,7 @@ enum Hit {
     RulesGroup(usize),
     RulesNewGroup,
     RulesPick,
-    RulesMatcher(crate::inventory::rules::Matcher),
+    RulesMatcher(super::super::inventory::rules::Matcher),
     RulesEntryAdd,
     RulesEntryRemove(usize),
     RulesEntrySave,

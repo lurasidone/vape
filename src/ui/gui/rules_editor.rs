@@ -7,7 +7,7 @@
 // preset with a kind, one value and the common comparison, plus the item and
 // hotbar-slot rules.
 use super::View;
-use crate::inventory::rules::{
+use super::super::super::inventory::rules::{
     parse_presets, parse_profiles, Action, Compare, Condition, ConditionGroup, EffectMode, Filter,
     Matcher, Preset, Profile, Rule, TextMode,
 };

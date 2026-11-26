@@ -3196,3 +3196,20 @@ cycle, the rule's custom-rule uuid round-trip, the click-GUI
 NEW/KIND/ADD/operator/preset paths and the invalid-text preservation). The
 host build remains blocked (the horizon-rust 404 and the older xtask source
 pin), so this is implemented-core/unit-tested, not host-validated.
+## 2026-11-26: current-SDK host build via the launcher and mirror
+`HORIZON_SDK_BASE=https://horizon-mirror.nikitagrimm.de` with the isolated
+launcher home (`target/scenarios/sdk-validation-current/launcher`,
+`native-build target/current-native-mod --version nightly-2026-11-22-f1bb66f
+--profile optimized --trust-native-code`) built the full candidate project
+(`tools/native_sdk_project.py target/upstream-update/2026-11-22-f1bb66f/sdk.json
+--full`) as `native-f1bb66f-67339950f43e`. The first build exposed
+host-incompatible `crate::inventory` paths in the GUI editor (the lib compiles
+nested as `game::vape_rs` in the host); they now use module-relative
+`super::...` paths. `cargo test --offline --lib` passes 514. The smoke on the
+new build runs 25/27 (the two sprint/pause checks are focus-related), the GUI
+opens, and the HUD editor lists its modules. The prepared 26.3 resources were
+built with `horizon-prepare` from `~/.minecraft` plus the Prism assets index
+(`--assets-dir ~/.local/share/PrismLauncher/assets`). The HUD detail
+scenario's `client.gui.binds` seed is now `ShiftLeft` (the current key name);
+its click coordinates are still the old pin's (the Compass click hits the
+Clock), so the scenario's assertions do not pass yet.
