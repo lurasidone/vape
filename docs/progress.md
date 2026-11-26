@@ -3079,3 +3079,24 @@ rotated axes (forward/back/left/right by the relative yaw, the reference's
 the packet drives the movement. `cargo check --offline` and the native
 build (`native-f1bb66f-78e09a0ae5d1`) pass. BedBreaker's host is complete;
 its host scenario remains.
+
+## 2026-11-26: CrystalAura place/break/attack loop
+
+The auto submodule now runs the reference's loop on the real selector: the
+host resolves the target mob and safe crystal base with the real block
+density and the player's armor, the shared silent rotation
+(`Claimant::CrystalAura`, priority 6) aims at the interaction point or the
+tracked crystal, and the module's `Delay`/`Action delay` timers gate the
+placement and the next break/place cycle. A placement selects the crystal
+slot, presses use at the managed rotation and waits (a 500 ms timeout) for
+the crystal; an existing crystal switches to breaking, and the crystal under
+the managed crosshair is attacked (`remote_attack_entity` on a server,
+`EndCrystal.hurtServer`'s `command_damage_crystal` in a local world). The
+Manual submodule and auto-obsidian placement remain.
+
+`cargo test --offline --lib` passes 491 tests (22 crystal_aura); the native
+SDK build (`native-f1bb66f-8e8e51f1eb70`) compiles; the new
+`tools/crystal_aura_scenario.py` passes **7/7** in a fresh isolated world
+(floor, wall, obsidian, netherite armor, a cow target): the module starts
+disabled, enables through its bind, places, attacks, kills the cow and the
+player survives the blast.

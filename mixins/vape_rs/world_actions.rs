@@ -11,6 +11,7 @@ use crate::game::vape_rs::modules::movement::movement_task::{Body, World};
 use crate::game::vape_rs::modules::movement::scaffold_bridge::{Hit, Inventory, Stack};
 use crate::game::vape_rs::modules::movement::{inv_walk, scaffold, wind_charge};
 use crate::game::vape_rs::modules::combat::crystal_aura;
+use crate::game::vape_rs::modules::combat::rotation;
 use horizon_core::geometry::Vec3;
 use winit::keyboard::KeyCode;
 
@@ -328,62 +329,45 @@ fn inv_walk_screen(game: &Game<'_>, gui_open: bool, capturing: bool) -> inv_walk
     }
 }
 
-/// CrystalAura's target selection: an alive mob in range, then the nearest
-/// crystal-base block whose explosion is safe for the player.
-fn crystal_aura_tick(game: &mut Game<'_>) {
-    let client = crate::game::vape_rs::core::client().clone();
-    if !with_client(&client, |runtime| runtime.enabled(ModuleId::CrystalAura)) {
-        return;
-    }
-    let Some(player) = game.player.as_ref() else {
-        return;
-    };
-    let (range, max_self_damage, anti_suicide) = with_client(&client, |runtime| {
-        let settings = runtime.settings();
-        let number = |suffix: &str, default: f64| {
-            settings
-                .get(&format!("{}.{suffix}", crystal_aura::ID))
-                .and_then(serde_json::Value::as_f64)
-                .unwrap_or(default)
-        };
-        (
-            number("range", 4.5),
-            number("max-self-damage", 12.0),
-            settings
-                .get(&format!("{}.anti-suicide", crystal_aura::ID))
-                .and_then(serde_json::Value::as_bool)
-                .unwrap_or(true),
-        )
-    });
-    let (px, py, pz) = (player.position.x, player.position.y, player.position.z);
-    let eye = [px, py + f64::from(player.dimensions.eye_height), pz];
-    let health = player.health.health();
-    let absorption = player.health.absorption();
-    let distance = |mob: &horizon_client::mobs::Mob| {
-        let (dx, dy, dz) = (
-            mob.position.x - px,
-            mob.position.y - py,
-            mob.position.z - pz,
-        );
-        (dx * dx + dy * dy + dz * dz).sqrt()
-    };
-    let has_target = game.mobs.iter().any(|mob| {
-        mob.alive() && crystal_aura::in_range(distance(mob), range)
-    });
+/// The reference's `findActionAtYLevel`: the nearest crystal-base block whose
+/// crystal placement is safe. The scan tries the player's y level, then the
+/// one above, in the two-pass order toward the target.
+fn crystal_aura_base(
+    game: &Game<'_>,
+    options: &crystal_aura::Options,
+    feet: [f64; 3],
+    eye: [f64; 3],
+    health: f32,
+    absorption: f32,
+    player_box: crystal_aura::Aabb,
+    armor: f32,
+    toughness: f32,
+    target: Option<([f64; 2], bool)>,
+) -> Option<[i32; 3]> {
+    let (px, py, pz) = (feet[0], feet[1], feet[2]);
+    let (offset, close) = target?;
+    let base_y = py.floor() as i32;
+    let base = [px.floor() as i32, base_y, pz.floor() as i32];
     let facts = game.res.facts();
-    let is_base = |block: [i32; 3]| {
-        crystal_aura::is_crystal_base(
-            &facts
-                .get(game.world.block(block[0], block[1], block[2]))
-                .name,
-        )
+    let replaceable = |block: [i32; 3]| {
+        facts
+            .get(game.world.block(block[0], block[1], block[2]))
+            .replaceable
     };
-    let base = [px.floor() as i32, py.floor() as i32, pz.floor() as i32];
-    let mut best: Option<[i32; 3]> = None;
-    if has_target {
-        for offset in crystal_aura::search_offsets(3, false, [1.0, 1.0]) {
-            let block = [base[0] + offset[0], base[1], base[2] + offset[1]];
-            if !is_base(block) {
+    for y in [base_y, base_y + 1] {
+        for scan in crystal_aura::search_offsets(3, close, offset) {
+            let block = [base[0] + scan[0], y, base[2] + scan[1]];
+            if !crystal_aura::is_crystal_base(
+                &facts
+                    .get(game.world.block(block[0], block[1], block[2]))
+                    .name,
+            ) {
+                continue;
+            }
+            // The crystal needs both blocks above the base.
+            if !replaceable([block[0], y + 1, block[2]])
+                || !replaceable([block[0], y + 2, block[2]])
+            {
                 continue;
             }
             let explosion = [
@@ -391,38 +375,294 @@ fn crystal_aura_tick(game: &mut Game<'_>) {
                 f64::from(block[1]) + 1.0,
                 f64::from(block[2]) + 0.5,
             ];
-            // The unblocked density is conservative: it overestimates the
-            // self damage, so only clear placements pass.
+            let distance = ((explosion[0] - eye[0]).powi(2)
+                + (explosion[1] - eye[1]).powi(2)
+                + (explosion[2] - eye[2]).powi(2))
+            .sqrt();
+            if distance > 4.5 {
+                continue;
+            }
+            // `calculateBlockDensity`: the fraction of the player's box with
+            // a clear ray to the explosion, then the player's armor.
+            let density = crystal_aura::block_density(
+                player_box.min,
+                player_box.max,
+                |point| {
+                    let (dx, dy, dz) = (
+                        explosion[0] - point[0],
+                        explosion[1] - point[1],
+                        explosion[2] - point[2],
+                    );
+                    let reach = (dx * dx + dy * dy + dz * dz).sqrt();
+                    if reach <= 0.0 {
+                        return true;
+                    }
+                    let direction = [dx / reach, dy / reach, dz / reach];
+                    game.clip_ray(point, direction, reach).is_none()
+                },
+            );
             let damage = crystal_aura::explosion_damage(
                 crystal_aura::ExplosionType::Crystal,
                 explosion,
                 eye,
-                1.0,
-                0.0,
-                0.0,
+                density,
+                armor,
+                toughness,
                 0.0,
             );
-            if crystal_aura::self_damage_safe(damage, health, absorption, anti_suicide, max_self_damage)
-            {
-                best = Some(block);
-                break;
+            if crystal_aura::self_damage_safe(
+                damage,
+                health,
+                absorption,
+                options.anti_suicide,
+                options.max_self_damage,
+            ) {
+                return Some(block);
             }
         }
     }
-    with_client(&client, |runtime| {
-        let target = runtime.crystal_aura();
-        match best {
-            Some(block) => {
-                target.block = Some(block);
-                if target.state == crystal_aura::State::Idle {
-                    target.set_state(crystal_aura::State::PlacingCrystal);
-                }
-            }
-            None => target.set_state(crystal_aura::State::Idle),
+    None
+}
+
+/// The reference's `validateAction`/`clickUseItem` and attack key: the host
+/// presses use at the managed rotation or attacks the crystal. The pinned
+/// host's local melee has no `EndCrystal` branch, so a local world damages
+/// the crystal through `EndCrystal.hurtServer`'s host implementation.
+fn crystal_aura_attack(game: &mut Game<'_>, id: i32, distance: f64) {
+    if game.remote.is_some() {
+        if game.remote_attack_entity(id, distance) {
+            crate::game::remote::vape_combat_remote::swing(game);
+        }
+    } else {
+        game.command_damage_crystal(
+            id as u32,
+            "minecraft:player_attack",
+            horizon_client::mobs::DamageKind::PlayerAttack,
+            Some(crate::game::commands::Target::Player),
+            Some(crate::game::commands::Target::Player),
+            None,
+        );
+        game.swing_arm();
+    }
+}
+
+/// CrystalAura's auto loop: the real selector picks a safe base, the shared
+/// silent rotation aims at the interaction point, and the reference's
+/// delay/action timers drive place -> break -> attack.
+fn crystal_aura_tick(game: &mut Game<'_>) {
+    let client = crate::game::vape_rs::core::client().clone();
+    if !with_client(&client, |runtime| runtime.enabled(ModuleId::CrystalAura)) {
+        let restore = with_client(&client, |runtime| runtime.crystal_aura_release());
+        if let Some(slot) = restore
+            .and_then(|slot| usize::try_from(slot).ok())
+            .filter(|slot| *slot < 9)
+        {
+            game.selected = slot;
+        }
+        return;
+    }
+    let options = with_client(&client, |runtime| {
+        crystal_aura::Options::read(runtime.settings())
+    });
+    if options.mode != crystal_aura::Mode::Auto {
+        let restore = with_client(&client, |runtime| runtime.crystal_aura_release());
+        if let Some(slot) = restore
+            .and_then(|slot| usize::try_from(slot).ok())
+            .filter(|slot| *slot < 9)
+        {
+            game.selected = slot;
+        }
+        return;
+    }
+    // `attribute` computes from the modifier map, so it needs `&mut`; the
+    // rest of the tick reads the player immutably.
+    let (armor, toughness) = {
+        let Some(player) = game.player.as_mut() else {
+            return;
+        };
+        let armor = player.attribute("minecraft:armor").unwrap_or(0.0) as f32;
+        let toughness = match player.attribute("minecraft:armor_toughness") {
+            Ok(value) => value,
+            Err(_) => player.attribute("armor_toughness").unwrap_or(0.0),
+        } as f32;
+        (armor, toughness)
+    };
+    let Some(player) = game.player.as_ref() else {
+        return;
+    };
+    let (px, py, pz) = (player.position.x, player.position.y, player.position.z);
+    let eye = [px, py + f64::from(player.dimensions.eye_height), pz];
+    let health = player.health.health();
+    let absorption = player.health.absorption();
+    let bounds = player.bounds();
+    let (bounds_min, bounds_max) = (bounds.min_position(), bounds.max_position());
+    let player_box = crystal_aura::Aabb {
+        min: [bounds_min.x, bounds_min.y, bounds_min.z],
+        max: [bounds_max.x, bounds_max.y, bounds_max.z],
+    };
+    let can_act = matches!(game.screen, crate::game::Screen::Playing) && health > 0.0;
+    let view = (game.yaw, game.pitch);
+    let selected = game.selected as i32;
+    let crystal_slot = game
+        .inventory
+        .iter()
+        .take(9)
+        .position(|stack| {
+            stack
+                .as_ref()
+                .is_some_and(|stack| crystal_aura::is_end_crystal(&stack.item))
+        })
+        .map_or(-1, |slot| slot as i32);
+    let target = game
+        .mobs
+        .iter()
+        .filter(|mob| mob.alive())
+        .filter_map(|mob| {
+            let (dx, dy, dz) = (
+                mob.position.x - px,
+                mob.position.y - py,
+                mob.position.z - pz,
+            );
+            let distance = (dx * dx + dy * dy + dz * dz).sqrt();
+            crystal_aura::in_range(distance, options.range).then_some((
+                [mob.position.x - px, mob.position.z - pz],
+                distance <= 1.75,
+                mob.bounds(),
+                distance,
+            ))
+        })
+        .min_by(|a, b| a.3.total_cmp(&b.3));
+    let has_target = target.is_some();
+    let target_bounds = target.as_ref().map(|(_, _, bounds, _)| {
+        let (min, max) = (bounds.min_position(), bounds.max_position());
+        crystal_aura::Aabb {
+            min: [min.x, min.y, min.z],
+            max: [max.x, max.y, max.z],
         }
     });
-    // No use/attack fires off this selection yet: the rotation to the
-    // interaction point and the reference's delay timers must land first.
+    let base = crystal_aura_base(
+        game,
+        &options,
+        [px, py, pz],
+        eye,
+        health,
+        absorption,
+        player_box,
+        armor,
+        toughness,
+        target.as_ref().map(|(offset, close, _, _)| (*offset, *close)),
+    );
+    // The reference's `wouldIntersect`: the target's box in the crystal
+    // space blocks a placement (an existing crystal is attacked instead).
+    let place_blocked = match (base, target_bounds) {
+        (Some(base), Some(target)) => crystal_aura::crystal_box(base).intersects(&target),
+        _ => false,
+    };
+    let crystals: Vec<([f64; 3], i32)> = game
+        .crystals
+        .iter()
+        .map(|crystal| {
+            (
+                [crystal.position.x, crystal.position.y, crystal.position.z],
+                crystal.id as i32,
+            )
+        })
+        .collect();
+    let crystal_above =
+        base.and_then(|base| crystal_aura::crystal_above(base, crystals.iter().copied()));
+    let crystal_point = crystal_above
+        .and_then(|id| crystals.iter().find(|(_, crystal)| *crystal == id))
+        .map(|(position, _)| {
+            crystal_aura::nearest_point(eye, crystal_aura::crystal_entity_box(*position))
+        })
+        .or_else(|| {
+            base.map(|base| {
+                [
+                    f64::from(base[0]) + 0.5,
+                    f64::from(base[1]) + 1.0,
+                    f64::from(base[2]) + 0.5,
+                ]
+            })
+        })
+        .unwrap_or(eye);
+    // The managed rotation's crosshair (the reference's
+    // `getNormalReachRayTrace`), not the camera's.
+    let managed = with_client(&client, |runtime| runtime.managed_view(view));
+    let direction = rotation::direction(managed.0, managed.1);
+    let block_hit = game.clip_ray(eye, direction, 4.5);
+    let aimed_block = block_hit.map(|hit| (hit.pos, crystal_aura::facing_index(hit.face)));
+    let block_distance = block_hit.map(|hit| {
+        ((hit.point[0] - eye[0]).powi(2)
+            + (hit.point[1] - eye[1]).powi(2)
+            + (hit.point[2] - eye[2]).powi(2))
+        .sqrt()
+    });
+    let mut aimed_crystal = None;
+    let mut crystal_distance = f64::INFINITY;
+    for (position, id) in &crystals {
+        let bounds = crystal_aura::crystal_entity_box(*position);
+        if let Some(distance) = rotation::ray_box(eye, direction, 4.5, bounds.min, bounds.max)
+            && distance < crystal_distance
+            && block_distance.is_none_or(|block| distance <= block)
+        {
+            crystal_distance = distance;
+            aimed_crystal = Some(*id);
+        }
+    }
+    let tick = crystal_aura::Tick {
+        now_ms: with_client(&client, |runtime| runtime.now_ms()),
+        has_target,
+        base,
+        crystal_above,
+        crystal_slot,
+        selected,
+        eye,
+        view,
+        aimed_block,
+        aimed_crystal,
+        crystal_point,
+        can_act,
+    };
+    let mut actions = with_client(&client, |runtime| runtime.crystal_aura_tick(&tick));
+    if actions.use_now && place_blocked {
+        actions.use_now = false;
+    }
+    if let Some(slot) = actions
+        .select
+        .and_then(|slot| usize::try_from(slot).ok())
+        .filter(|slot| *slot < 9)
+        && can_act
+    {
+        game.selected = slot;
+    }
+    if let Some(slot) = actions
+        .restore
+        .and_then(|slot| usize::try_from(slot).ok())
+        .filter(|slot| *slot < 9)
+    {
+        game.selected = slot;
+    }
+    if actions.use_now && can_act {
+        // `clickUseItem` at the interaction point: the placement takes the
+        // managed rotation and the camera stays. A local world goes through
+        // the item use, a server through the multiplayer use packet.
+        let camera = (game.yaw, game.pitch);
+        (game.yaw, game.pitch) = managed;
+        if game.remote.is_some() {
+            game.remote_use(mod_api::InteractionAttempt::Press);
+        } else if game.using.is_none() {
+            if let Err(error) = game.use_with_hand() {
+                with_client(&client, |runtime| {
+                    runtime.notify(format!("Crystal placement failed: {error}"))
+                });
+            }
+            game.use_delay = 4;
+        }
+        (game.yaw, game.pitch) = camera;
+    }
+    if let Some(id) = actions.attack.filter(|_| can_act) {
+        crystal_aura_attack(game, id, crystal_distance);
+    }
 }
 
 /// Client tick HEAD, before the movement writer.

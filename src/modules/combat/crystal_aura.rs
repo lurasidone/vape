@@ -3,10 +3,14 @@
 // The reference's placement/target submodules run on top of these: the
 // damage model decides whether a placement or break is safe, and the
 // interaction point is the ray the rotation aims at.
-use super::super::super::core::settings::{Definition, Settings};
-use serde_json::Value;
+use super::super::super::core::settings::{Definition, Kind, Settings};
+use serde_json::{Value, json};
 
 pub const ID: &str = "combat.crystal-aura";
+
+/// The placement click waits this long for its crystal before it may click
+/// again (`placementSent`); the reference's use delay is four ticks.
+pub const PLACEMENT_TIMEOUT_MS: u64 = 500;
 
 pub fn definitions() -> Vec<Definition> {
     vec![
@@ -15,12 +19,37 @@ pub fn definitions() -> Vec<Definition> {
         Definition::number(
             &format!("{ID}.max-self-damage"),
             "Max self damage",
-            1.0,
-            12.0,
+            0.0,
+            19.0,
             20.0,
-            0.5,
+            1.0,
         ),
         Definition::boolean(&format!("{ID}.anti-suicide"), "Anti suicide", true),
+        Definition::number(&format!("{ID}.aim-speed"), "Aim speed", 1.0, 4.5, 10.0, 0.1),
+        // The reference's `activationDelay` (`Delay`, 50-150 ms by default,
+        // re-drawn every tick) before the first action.
+        Definition::new(
+            &format!("{ID}.delay"),
+            "Delay",
+            Kind::Range {
+                min: 50.0,
+                max: 500.0,
+                step: 1.0,
+            },
+            json!([50.0, 150.0]),
+        ),
+        // The reference manual submodule's `delay` (0-100 ms by default)
+        // between a completed break/place cycle and the next one.
+        Definition::new(
+            &format!("{ID}.action-delay"),
+            "Action delay",
+            Kind::Range {
+                min: 0.0,
+                max: 500.0,
+                step: 1.0,
+            },
+            json!([0.0, 100.0]),
+        ),
     ]
 }
 
@@ -36,6 +65,56 @@ impl Mode {
         match settings.get(&format!("{ID}.mode")).and_then(Value::as_str) {
             Some("Manual") => Self::Manual,
             _ => Self::Auto,
+        }
+    }
+}
+
+/// The auto placement loop's settings, read once per tick.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Options {
+    pub mode: Mode,
+    pub range: f64,
+    pub max_self_damage: f64,
+    pub anti_suicide: bool,
+    pub aim_speed: f64,
+    /// The activation delay range (`RandomValue.getRandomValue`).
+    pub delay: (f64, f64),
+    /// The delay between completed break/place cycles.
+    pub action_delay: (f64, f64),
+}
+
+impl Options {
+    pub fn read(settings: &Settings) -> Self {
+        let number = |suffix: &str, default: f64| {
+            settings
+                .get(&format!("{ID}.{suffix}"))
+                .and_then(Value::as_f64)
+                .unwrap_or(default)
+        };
+        let range = |suffix: &str, default: (f64, f64)| {
+            let value = settings
+                .get(&format!("{ID}.{suffix}"))
+                .and_then(Value::as_array);
+            let at = |i: usize, d: f64| {
+                value
+                    .as_ref()
+                    .and_then(|v| v.get(i))
+                    .and_then(Value::as_f64)
+                    .unwrap_or(d)
+            };
+            (at(0, default.0), at(1, default.1))
+        };
+        Self {
+            mode: Mode::read(settings),
+            range: number("range", 4.5),
+            max_self_damage: number("max-self-damage", 19.0),
+            anti_suicide: settings
+                .get(&format!("{ID}.anti-suicide"))
+                .and_then(Value::as_bool)
+                .unwrap_or(true),
+            aim_speed: number("aim-speed", 4.5),
+            delay: range("delay", (50.0, 150.0)),
+            action_delay: range("action-delay", (0.0, 100.0)),
         }
     }
 }
@@ -122,7 +201,11 @@ pub fn block_density(
         }
         x_fraction += x_step;
     }
-    if total == 0 { 0.0 } else { clear as f32 / total as f32 }
+    if total == 0 {
+        0.0
+    } else {
+        clear as f32 / total as f32
+    }
 }
 
 /// The reference's `calculateExplosionDamage` at the normalized distance.
@@ -273,9 +356,50 @@ pub fn inside_bounds(position: [f64; 3], low: [i32; 3], high: [i32; 3]) -> bool 
         && (low[2]..=high[2]).contains(&floors[2])
 }
 
-/// The reference's `CrystalAuraTargetSubModule` state ledger: the target
-/// block, the tracked crystal and the carried slot.
+/// The auto placement loop's world inputs for one tick. The host resolves
+/// the selector, the crystal above the base and the crosshair along the
+/// managed rotation; the loop owns the state and the timers.
 #[derive(Clone, Copy, Debug, Default)]
+pub struct Tick {
+    pub now_ms: u64,
+    /// An alive mob within range.
+    pub has_target: bool,
+    /// The selector's safe crystal-base block.
+    pub base: Option<[i32; 3]>,
+    /// The crystal above `base`, when one exists.
+    pub crystal_above: Option<i32>,
+    /// The hotbar slot holding an end crystal, -1 when none.
+    pub crystal_slot: i32,
+    pub selected: i32,
+    pub eye: [f64; 3],
+    pub view: (f32, f32),
+    /// The block under the managed rotation's crosshair, with its facing
+    /// index (0 down, 1 up, 2 north, 3 south, 4 west, 5 east).
+    pub aimed_block: Option<([i32; 3], u8)>,
+    /// The crystal under the managed rotation's crosshair.
+    pub aimed_crystal: Option<i32>,
+    /// The nearest point on the tracked crystal's box to the eye.
+    pub crystal_point: [f64; 3],
+    /// No screen is open and the player is alive.
+    pub can_act: bool,
+}
+
+/// What the host does after a tick: aim the shared rotation at `aim`, switch
+/// the carried slot, restore the saved slot on release, press use or attack.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Actions {
+    pub aim: Option<[f64; 3]>,
+    pub select: Option<i32>,
+    pub restore: Option<i32>,
+    pub use_now: bool,
+    pub attack: Option<i32>,
+    /// Release the rotation and the saved slot (reset).
+    pub release: bool,
+}
+
+/// The reference's `CrystalAuraTargetSubModule` state ledger: the target
+/// block, the tracked crystal, the carried slot and the delay/action timers.
+#[derive(Clone, Copy, Debug)]
 pub struct Target {
     pub state: State,
     pub block: Option<[i32; 3]>,
@@ -283,11 +407,30 @@ pub struct Target {
     pub crystal_slot: i32,
     pub saved_slot: i32,
     pub prediction: Prediction,
+    /// The reference's `delayTimer`: the last reset (activation delay).
+    pub delay_at: u64,
+    /// The reference's `actionTimer`: the last reset (between cycles).
+    pub action_at: u64,
+    /// Completed break/place cycles since the last reset.
+    pub cycles: u32,
+    /// The reference's `placementSent`: a placement click waits for its
+    /// crystal.
+    pub placement_sent: bool,
+    /// When the placement click was sent.
+    pub placed_at: u64,
+    /// `RandomValue.getRandomValue`'s generator.
+    rng: u64,
 }
 
 impl Default for State {
     fn default() -> Self {
         Self::Idle
+    }
+}
+
+impl Default for Target {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -300,6 +443,12 @@ impl Target {
             crystal_slot: -1,
             saved_slot: -1,
             prediction: Prediction::default(),
+            delay_at: 0,
+            action_at: 0,
+            cycles: 0,
+            placement_sent: false,
+            placed_at: 0,
+            rng: 0,
         }
     }
 
@@ -314,12 +463,20 @@ impl Target {
             self.block = None;
             self.tracked = None;
             self.crystal_slot = -1;
+            self.placement_sent = false;
         }
     }
 
     /// The reference's `clearTracking`.
     pub fn reset(&mut self) {
         *self = Self::new();
+    }
+
+    /// `clearTracking` plus both timers reset at `now_ms`.
+    pub fn reset_at(&mut self, now_ms: u64) {
+        self.reset();
+        self.delay_at = now_ms;
+        self.action_at = now_ms;
     }
 
     /// The reference's `handlePlacingCrystal` entry: an existing crystal
@@ -329,6 +486,132 @@ impl Target {
             Some(id) => (State::BreakingCrystal, Some(id)),
             None => (State::PlacingCrystal, None),
         }
+    }
+
+    /// `Random.nextDouble`.
+    fn random(&mut self) -> f64 {
+        if self.rng == 0 {
+            self.rng = 0x2545_f491_4f6c_dd1d;
+        }
+        self.rng ^= self.rng << 13;
+        self.rng ^= self.rng >> 7;
+        self.rng ^= self.rng << 17;
+        (self.rng >> 11) as f64 / (1u64 << 53) as f64
+    }
+
+    /// `(long) RandomValue.getRandomValue()`: uniform in `[lo, hi)`.
+    fn draw_delay(&mut self, (lo, hi): (f64, f64)) -> u64 {
+        if hi <= lo {
+            return lo.max(0.0) as u64;
+        }
+        (lo + (hi - lo) * self.random()).max(0.0) as u64
+    }
+
+    /// `delayTimer.hasTimeElapsed((long) activationDelay.getRandomValue())`.
+    pub fn activation_ready(&mut self, now_ms: u64, delay: (f64, f64)) -> bool {
+        let threshold = self.draw_delay(delay);
+        now_ms.saturating_sub(self.delay_at) >= threshold
+    }
+
+    /// `actionTimer.hasTimeElapsed((long) delay.getRandomValue())`.
+    pub fn action_ready(&mut self, now_ms: u64, delay: (f64, f64)) -> bool {
+        let threshold = self.draw_delay(delay);
+        now_ms.saturating_sub(self.action_at) >= threshold
+    }
+
+    /// One tick of the reference's auto placement loop: validate the parked
+    /// action, start a new one after the activation delay, select the
+    /// crystal and act once the managed rotation's crosshair is on it.
+    pub fn tick(&mut self, tick: &Tick, options: &Options) -> Actions {
+        let mut out = Actions::default();
+        if !tick.can_act || !tick.has_target || tick.base.is_none() || tick.crystal_slot < 0 {
+            out.restore = (self.saved_slot >= 0).then_some(self.saved_slot);
+            out.release = true;
+            self.reset_at(tick.now_ms);
+            return out;
+        }
+        let base = tick.base.expect("checked above");
+
+        // The selector moved off this base: drop the parked action.
+        if matches!(self.state, State::PlacingCrystal | State::BreakingCrystal)
+            && self.block != Some(base)
+        {
+            self.set_state(State::Idle);
+        }
+        match self.state {
+            State::PlacingCrystal => {
+                if let Some(id) = tick.crystal_above {
+                    self.tracked = Some(id);
+                    self.placement_sent = false;
+                    self.set_state(State::BreakingCrystal);
+                } else if self.placement_sent
+                    && tick.now_ms.saturating_sub(self.placed_at) > PLACEMENT_TIMEOUT_MS
+                {
+                    // The click did not produce a crystal; allow another.
+                    self.placement_sent = false;
+                }
+            }
+            State::BreakingCrystal => match tick.crystal_above {
+                Some(id) => self.tracked = Some(id),
+                None => {
+                    self.tracked = None;
+                    self.placement_sent = false;
+                    self.set_state(State::PlacingCrystal);
+                    self.action_at = tick.now_ms;
+                }
+            },
+            State::Idle | State::PlacingObsidian => {}
+        }
+
+        if self.state == State::Idle
+            && self.activation_ready(tick.now_ms, options.delay)
+            && (self.cycles == 0 || self.action_ready(tick.now_ms, options.action_delay))
+        {
+            self.block = Some(base);
+            match tick.crystal_above {
+                Some(id) => {
+                    self.tracked = Some(id);
+                    self.set_state(State::BreakingCrystal);
+                }
+                None => self.set_state(State::PlacingCrystal),
+            }
+        }
+
+        if self.state != State::Idle && tick.selected != tick.crystal_slot {
+            if self.saved_slot < 0 {
+                self.saved_slot = tick.selected;
+            }
+            out.select = Some(tick.crystal_slot);
+        }
+
+        match self.state {
+            State::PlacingCrystal => {
+                out.aim = Some(interaction_point(base, 1));
+                // The manual submodule's `handlePlacingCrystal` waits the
+                // action delay after a break before clicking again.
+                if !self.placement_sent
+                    && self.action_ready(tick.now_ms, options.action_delay)
+                    && tick.aimed_block == Some((base, 1))
+                {
+                    out.use_now = true;
+                    self.placement_sent = true;
+                    self.placed_at = tick.now_ms;
+                }
+            }
+            State::BreakingCrystal => {
+                out.aim = Some(tick.crystal_point);
+                if self.tracked.is_some() && tick.aimed_crystal == self.tracked {
+                    out.attack = self.tracked;
+                    out.aim = None;
+                    self.cycles = self.cycles.saturating_add(1);
+                    self.action_at = tick.now_ms;
+                    self.placement_sent = false;
+                    self.set_state(State::Idle);
+                }
+            }
+            State::Idle | State::PlacingObsidian => {}
+        }
+        out
     }
 }
 
@@ -449,12 +732,70 @@ impl Aabb {
 /// The reference's `crystalBoundingBox`: the 1x2x1 space above the base.
 pub fn crystal_box(base: [i32; 3]) -> Aabb {
     Aabb {
-        min: [f64::from(base[0]), f64::from(base[1]) + 1.0, f64::from(base[2])],
+        min: [
+            f64::from(base[0]),
+            f64::from(base[1]) + 1.0,
+            f64::from(base[2]),
+        ],
         max: [
             f64::from(base[0]) + 1.0,
             f64::from(base[1]) + 3.0,
             f64::from(base[2]) + 1.0,
         ],
+    }
+}
+
+/// `EndCrystal.getBoundingBox`: 2 x 2 x 2 around its position (`width` 2,
+/// `height` 2, centred horizontally).
+pub fn crystal_entity_box(position: [f64; 3]) -> Aabb {
+    Aabb {
+        min: [position[0] - 1.0, position[1], position[2] - 1.0],
+        max: [position[0] + 1.0, position[1] + 2.0, position[2] + 1.0],
+    }
+}
+
+/// The reference's `findCrystalAbove`: the crystal whose entity box
+/// intersects the 1x2x1 search box above the base.
+pub fn crystal_above(
+    base: [i32; 3],
+    crystals: impl IntoIterator<Item = ([f64; 3], i32)>,
+) -> Option<i32> {
+    let search = Aabb {
+        min: [
+            f64::from(base[0]) - 0.5,
+            f64::from(base[1]) + 0.99,
+            f64::from(base[2]) - 0.5,
+        ],
+        max: [
+            f64::from(base[0]) + 0.5,
+            f64::from(base[1]) + 3.0,
+            f64::from(base[2]) + 0.5,
+        ],
+    };
+    crystals
+        .into_iter()
+        .find(|(position, _)| crystal_entity_box(*position).intersects(&search))
+        .map(|(_, id)| id)
+}
+
+/// `RotationUtil.M(eye, box, 0, 0, 0)`: the nearest point on the box.
+pub fn nearest_point(eye: [f64; 3], bounds: Aabb) -> [f64; 3] {
+    [
+        eye[0].clamp(bounds.min[0], bounds.max[0]),
+        eye[1].clamp(bounds.min[1], bounds.max[1]),
+        eye[2].clamp(bounds.min[2], bounds.max[2]),
+    ]
+}
+
+/// `Direction.get3DDataValue` from a hit's face normal.
+pub fn facing_index(face: [i32; 3]) -> u8 {
+    match face {
+        [0, -1, 0] => 0,
+        [0, 1, 0] => 1,
+        [0, 0, -1] => 2,
+        [0, 0, 1] => 3,
+        [-1, 0, 0] => 4,
+        _ => 5,
     }
 }
 
@@ -471,8 +812,7 @@ pub fn search_offsets(radius: i32, target_close: bool, target_offset: [f64; 2]) 
                     continue;
                 }
                 if only_toward {
-                    let toward =
-                        target_offset[0] * f64::from(x) + target_offset[1] * f64::from(z);
+                    let toward = target_offset[0] * f64::from(x) + target_offset[1] * f64::from(z);
                     if toward < 0.0 {
                         continue;
                     }
@@ -644,5 +984,127 @@ mod tests {
         let close = search_offsets(1, true, [1.0, 0.0]);
         assert_eq!(close.len(), 16);
         assert!(close[..8].iter().any(|offset| offset[0] < 0));
+    }
+
+    fn options() -> Options {
+        Options {
+            mode: Mode::Auto,
+            range: 4.5,
+            max_self_damage: 12.0,
+            anti_suicide: true,
+            aim_speed: 4.5,
+            delay: (50.0, 50.0),
+            action_delay: (0.0, 0.0),
+        }
+    }
+
+    fn tick(now_ms: u64) -> Tick {
+        Tick {
+            now_ms,
+            has_target: true,
+            base: Some([1, 2, 3]),
+            crystal_slot: 0,
+            selected: 0,
+            can_act: true,
+            ..Tick::default()
+        }
+    }
+
+    #[test]
+    fn the_activation_delay_gates_the_first_action() {
+        let mut target = Target::new();
+        target.reset_at(1_000);
+        let options = options();
+        assert_eq!(target.tick(&tick(1_020), &options), Actions::default());
+        let actions = target.tick(&tick(1_050), &options);
+        assert_eq!(target.state, State::PlacingCrystal);
+        assert_eq!(actions.aim, Some([1.5, 3.0, 3.5]));
+        assert!(!actions.use_now);
+    }
+
+    #[test]
+    fn a_crosshair_on_the_base_places_once_then_waits() {
+        let mut target = Target::new();
+        target.reset_at(1_000);
+        let options = options();
+        let mut tick = tick(1_050);
+        tick.aimed_block = Some(([1, 2, 3], 1));
+        assert!(target.tick(&tick, &options).use_now);
+        // `placementSent` holds the second click until the crystal appears.
+        assert!(!target.tick(&tick, &options).use_now);
+        // The reference's use delay expires; a failed click retries.
+        tick.now_ms = 1_050 + PLACEMENT_TIMEOUT_MS + 1;
+        assert!(target.tick(&tick, &options).use_now);
+    }
+
+    #[test]
+    fn a_crystal_above_the_base_is_attacked_and_restarts_the_cycle() {
+        let mut target = Target::new();
+        target.reset_at(1_000);
+        let options = options();
+        let mut tick = tick(1_050);
+        target.tick(&tick, &options);
+        tick.crystal_above = Some(7);
+        tick.aimed_crystal = Some(7);
+        tick.crystal_point = [1.5, 3.0, 3.5];
+        let actions = target.tick(&tick, &options);
+        assert_eq!(actions.attack, Some(7));
+        assert_eq!(target.state, State::Idle);
+        assert_eq!(target.cycles, 1);
+    }
+
+    #[test]
+    fn the_action_delay_gates_the_next_cycle() {
+        let mut target = Target::new();
+        target.reset_at(1_000);
+        let mut options = options();
+        options.action_delay = (100.0, 100.0);
+        let mut tick = tick(1_050);
+        target.tick(&tick, &options);
+        tick.crystal_above = Some(7);
+        tick.aimed_crystal = Some(7);
+        target.tick(&tick, &options);
+        assert_eq!(target.state, State::Idle);
+        tick.crystal_above = None;
+        tick.aimed_crystal = None;
+        tick.now_ms = 1_100;
+        assert_eq!(target.tick(&tick, &options), Actions::default());
+        tick.now_ms = 1_150;
+        assert_eq!(target.tick(&tick, &options).aim, Some([1.5, 3.0, 3.5]));
+        assert_eq!(target.state, State::PlacingCrystal);
+    }
+
+    #[test]
+    fn resetting_reports_the_saved_slot_and_drops_the_action() {
+        let mut target = Target::new();
+        target.reset_at(1_000);
+        target.saved_slot = 4;
+        target.block = Some([1, 2, 3]);
+        target.set_state(State::PlacingCrystal);
+        let mut tick = tick(1_050);
+        tick.can_act = false;
+        let actions = target.tick(&tick, &options());
+        assert!(actions.release);
+        assert_eq!(actions.restore, Some(4));
+        assert_eq!(target.state, State::Idle);
+        assert!(target.block.is_none());
+    }
+
+    #[test]
+    fn the_crystal_above_a_base_matches_its_entity_box() {
+        let base = [2, 5, -1];
+        assert_eq!(crystal_above(base, [([2.5, 6.0, -0.5], 3)]), Some(3));
+        // The next base's crystal touches only at the search box's edge.
+        assert_eq!(crystal_above(base, [([3.5, 6.0, -0.5], 4)]), None);
+        // A crystal three blocks up is out of the 1x2x1 search box.
+        assert_eq!(crystal_above(base, [([2.5, 8.0, -0.5], 5)]), None);
+    }
+
+    #[test]
+    fn the_nearest_crystal_point_is_clamped_to_the_box() {
+        let point = nearest_point([0.0, 0.0, 0.0], crystal_entity_box([3.0, 2.0, 0.0]));
+        assert_eq!(point, [2.0, 2.0, 0.0]);
+        let inside = nearest_point([3.0, 3.0, 0.0], crystal_entity_box([3.0, 2.0, 0.0]));
+        assert_eq!(inside, [3.0, 3.0, 0.0]);
     }
 }

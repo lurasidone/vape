@@ -1,8 +1,9 @@
 pub mod anti_fireball_runtime;
-pub mod bed_breaker_runtime;
 pub mod automation;
+pub mod bed_breaker_runtime;
 pub mod combat_extra;
 pub mod combat_runtime;
+pub mod crystal_aura_runtime;
 pub mod freecam_runtime;
 pub mod freelook_runtime;
 mod hud_extras;
@@ -29,8 +30,10 @@ mod visibility;
 
 pub use registry::ModuleId;
 
+use self::rotation_runtime::Silent;
 use super::actions::{Coordinator, HotbarSlot, Lease, Owner, Resource, SlotChange};
 use super::input::{BindingMode, KeyAction, MultiBinding};
+use super::modules::combat::rotation::{Claimant, Step};
 use super::modules::utility::{
     auto_tool,
     inventory_guard::{CombatGuard, CombatSnapshot},
@@ -41,8 +44,6 @@ use lifecycle::{CleanupReason, Context, Session};
 use profiles::{Document, Profiles};
 use serde_json::{Value, json};
 use settings::{Definition, Kind, Settings};
-use super::modules::combat::rotation::{Claimant, Step};
-use self::rotation_runtime::Silent;
 use std::{
     collections::{BTreeMap, VecDeque},
     path::PathBuf,
@@ -761,7 +762,11 @@ impl Runtime {
                 ModuleId::Sprint => self.sprint.reset(),
                 ModuleId::AntiAfk => self.anti_afk.reset(),
                 ModuleId::BedBreaker => self.bed_breaker.reset(),
-                ModuleId::CrystalAura => self.crystal_aura.reset(),
+                ModuleId::CrystalAura => {
+                    self.crystal_aura.reset();
+                    rotation_runtime::Shared::of(&mut self.combat, &mut self.rotations)
+                        .release(Claimant::CrystalAura);
+                }
                 ModuleId::Speed => self.speed.reset(),
                 ModuleId::LongJump => self.long_jump.reset(),
                 ModuleId::AntiFall => self.anti_fall.reset(),

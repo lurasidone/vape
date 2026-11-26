@@ -79,6 +79,9 @@ impl Runtime {
         if id.ends_with("-range") && id.starts_with("combat.kill-aura.") {
             self.couple_kill_aura_ranges(id);
         }
+        if id.starts_with("combat.crystal-aura.") {
+            self.crystal_aura.reset();
+        }
         let c = &mut self.combat;
         if id.starts_with("combat.kill-aura.") {
             c.kill_aura.reset();
@@ -96,6 +99,7 @@ impl Runtime {
     /// Session cleanup: nothing survives a world change, including the
     /// managed rotation.
     pub(super) fn combat_session_reset(&mut self) {
+        self.crystal_aura.reset();
         let c = &mut self.combat;
         c.kill_aura.reset();
         c.keep_sprint.reset();

@@ -84,8 +84,11 @@ some hook points moved. Current full build: `native-f1bb66f-76d3241d8036`.
   rotation and the movement-key remap is in. BedBreaker's host is complete;
   its host scenario remains.
 - **CrystalAura** is registered (`combat.crystal-aura`) with its settings,
-  explosion model, block helpers, target ledger/ordering/memory and search
-  order; the placement/target tick and game hooks remain.
+  explosion model, block helpers, target ledger/ordering/memory, the real
+  base selector (block density and player armor), the shared silent rotation
+  to the interaction point and the reference's Delay/Action delay timers
+  driving the Auto place -> break -> attack loop; `tools/crystal_aura_scenario.py`
+  passes **7/7**. The Manual submodule and auto-obsidian placement remain.
 - **Not started modules** (AutoAnchor, Block-In, the
   InventoryManager filter-rule editor, translations/fonts) can resume: the
   exact reference `3d600a48` / `4.21.43` is cloned at the sibling
@@ -101,8 +104,8 @@ have rows:
 - OmniSprint, CPSMod and SelfDestruct are not-applicable-reviewed: their reference bodies are empty, and SelfDestruct's unload is removed injection infrastructure.
 - Anti-FML is not-applicable-reviewed: Horizon sends no Forge handshake to cancel.
 
-Modules validated in a real game (83 module/client rows):
-- **Combat:** AutoClicker, RightClicker, TriggerBot, JumpReset, WTap, Sprint, KeepSprint, Velocity, HitBoxes, BlockHit, HitSelect, HitSwap, ShieldBreaker, TargetFilter, SilentAura clicker.
+Modules validated in a real game (84 module/client rows):
+- **Combat:** AutoClicker, RightClicker, TriggerBot, JumpReset, WTap, Sprint, KeepSprint, Velocity, HitBoxes, BlockHit, HitSelect, HitSwap, ShieldBreaker, TargetFilter, SilentAura clicker, CrystalAura (Auto loop).
 - **Movement:** NoSlowdown, Speed, Fly, NoFall, InvWalk, Timer, SafeWalk, NoItemRelease, WindCharge, Freecam.
 - **World / utility:** Anti-AFK, AutoFish, FastPlace, BackTrack, KnockbackDelay, Panic, AutoPearl, PearlCatch, AutoTool.
 - **Inventory:** Refill, Throwpot, ThrowDebuff, AutoHeal, AutoTotem, ChestSteal, InventoryManager, InvCleaner, AutoHotbar, ArmorSwitch.
@@ -120,11 +123,11 @@ and the deterministic timing.
 Implemented core (logic and tests, host path incomplete): HitFlick, the shared claim owners, session lifecycle, HUD drag/snap/scale and
 the typed setting editors.
 
-Not started: CrystalAura and its submodules, AutoAnchor, AutoLadder,
-BedBreaker, Block-In, Clutch, MLG, MotionBlur (it has hook targets now, see
-decisions.md), the InventoryManager filter-rule editor panel, and the
-translations/fonts row (the HUD still uses the host bitmap font; the GUI uses
-Geist).
+Not started: CrystalAura's Manual submodule and auto-obsidian placement,
+AutoAnchor, AutoLadder, BedBreaker, Block-In, Clutch, MLG, MotionBlur (it
+has hook targets now, see decisions.md), the InventoryManager filter-rule
+editor panel, and the translations/fonts row (the HUD still uses the host
+bitmap font; the GUI uses Geist).
 
 ## Blocked on the host
 
