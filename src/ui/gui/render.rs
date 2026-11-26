@@ -1494,6 +1494,7 @@ impl Gui {
     /// (click to cycle the action, the cross removes one) and the new rule.
     fn rules_popup(&self, view: &View, l: &mut Layout, editor: &rules_editor::RulesEditor) {
         let profiles = rules_editor::profiles(view);
+        let presets = rules_editor::presets(view);
         let (width, height) = self.logical();
         let panel = Rect(
             ((width - 300.0) / 2.0).max(4.0),
@@ -1516,55 +1517,119 @@ impl Gui {
             ROW_SCALE,
             Align::Left,
         );
-        for (label, slots, left) in [("ITEMS", false, 116.0), ("SLOTS", true, 72.0)] {
-            let tab = Rect(panel.0 + panel.2 - left, panel.1 + 4.0, 40.0, 12.0);
-            let active = editor.slots == slots;
+        for (label, tab, left) in [
+            ("PRESETS", rules_editor::Tab::Presets, 160.0),
+            ("SLOTS", rules_editor::Tab::Slots, 116.0),
+            ("ITEMS", rules_editor::Tab::Items, 72.0),
+        ] {
+            let rect = Rect(panel.0 + panel.2 - left, panel.1 + 4.0, 40.0, 12.0);
+            let active = editor.tab == tab;
             if active {
-                l.rounded(tab, PRESSED);
+                l.rounded(rect, PRESSED);
             }
             l.row_label(
-                tab.0 + tab.2 / 2.0,
-                tab.1,
-                tab.3,
+                rect.0 + rect.2 / 2.0,
+                rect.1,
+                rect.3,
                 label,
                 if active { self.accent } else { MUTED },
                 SMALL_SCALE,
                 Align::Center,
             );
-            l.hit(tab, Hit::RulesMode(slots));
+            l.hit(rect, Hit::RulesTab(tab));
         }
         l.icon(panel.0 + panel.2 - 13.0, panel.1 + 6.0, 1.0, &CROSS, MUTED);
         l.hit(
             Rect(panel.0 + panel.2 - 18.0, panel.1 + 2.0, 16.0, 14.0),
             Hit::RulesClose,
         );
-        let selected = editor.selected(&profiles).map(|p| p.name.clone());
         let mut px = panel.0 + 8.0;
-        for profile in &profiles {
-            let tab = Rect(px, panel.1 + 20.0, text_width(&profile.name) + 8.0, 13.0);
-            if tab.0 + tab.2 > panel.0 + panel.2 - 8.0 {
-                break;
+        if editor.tab == rules_editor::Tab::Presets {
+            let selected = editor.selected_preset(&presets).map(|p| p.uuid.clone());
+            for preset in &presets {
+                let tab = Rect(px, panel.1 + 20.0, text_width(&preset.name) + 8.0, 13.0);
+                if tab.0 + tab.2 > panel.0 + panel.2 - 44.0 {
+                    break;
+                }
+                let active = selected.as_deref() == Some(&preset.uuid);
+                if active {
+                    l.rounded(tab, PRESSED);
+                }
+                l.row_label(
+                    tab.0 + 4.0,
+                    tab.1,
+                    tab.3,
+                    &preset.name,
+                    if active { self.accent } else { MUTED },
+                    FIELD_SCALE,
+                    Align::Left,
+                );
+                l.hit(tab, Hit::RulesPresetValue(preset.uuid.clone()));
+                px += tab.2 + 4.0;
             }
-            let active = selected.as_deref() == Some(&profile.name);
-            if active {
-                l.rounded(tab, PRESSED);
-            }
-            l.row_label(
-                tab.0 + 4.0,
-                tab.1,
-                tab.3,
-                &profile.name,
-                if active { self.accent } else { MUTED },
-                FIELD_SCALE,
-                Align::Left,
+            l.button(
+                Rect(panel.0 + panel.2 - 36.0, panel.1 + 20.0, 30.0, 13.0),
+                "NEW",
+                Hit::RulesNewPreset,
             );
-            l.hit(tab, Hit::RulesProfile(profile.name.clone()));
-            px += tab.2 + 4.0;
+        } else {
+            let selected = editor.selected(&profiles).map(|p| p.name.clone());
+            for profile in &profiles {
+                let tab = Rect(px, panel.1 + 20.0, text_width(&profile.name) + 8.0, 13.0);
+                if tab.0 + tab.2 > panel.0 + panel.2 - 8.0 {
+                    break;
+                }
+                let active = selected.as_deref() == Some(&profile.name);
+                if active {
+                    l.rounded(tab, PRESSED);
+                }
+                l.row_label(
+                    tab.0 + 4.0,
+                    tab.1,
+                    tab.3,
+                    &profile.name,
+                    if active { self.accent } else { MUTED },
+                    FIELD_SCALE,
+                    Align::Left,
+                );
+                l.hit(tab, Hit::RulesProfile(profile.name.clone()));
+                px += tab.2 + 4.0;
+            }
         }
         let add_y = panel.1 + panel.3 - 30.0;
         let mut y = panel.1 + 38.0;
-        if let Some(profile) = editor.selected(&profiles) {
-            if editor.slots {
+        if editor.tab == rules_editor::Tab::Presets {
+            if let Some(preset) = editor.selected_preset(&presets) {
+                let room = ((add_y - y) / 15.0).floor().max(0.0) as usize;
+                let conditions = preset
+                    .groups
+                    .first()
+                    .map(|g| g.conditions.as_slice())
+                    .unwrap_or(&[]);
+                for (i, condition) in conditions.iter().enumerate().take(room) {
+                    let row = Rect(panel.0 + 6.0, y, panel.2 - 12.0, 14.0);
+                    if row.contains(self.hover) {
+                        l.fill(row, PRESSED);
+                    }
+                    l.row_label(
+                        row.0 + 2.0,
+                        row.1,
+                        row.3,
+                        &fit(&rules_editor::summary(condition), row.2 - 20.0, FIELD_SCALE),
+                        FG,
+                        FIELD_SCALE,
+                        Align::Left,
+                    );
+                    l.icon(row.0 + row.2 - 8.0, row.1 + 4.5, 1.0, &CROSS, MUTED);
+                    l.hit(
+                        Rect(row.0 + row.2 - 14.0, row.1, 14.0, row.3),
+                        Hit::RulesRemoveCondition(i),
+                    );
+                    y += 15.0;
+                }
+            }
+        } else if let Some(profile) = editor.selected(&profiles) {
+            if editor.tab == rules_editor::Tab::Slots {
                 for slot in 0..9u8 {
                     let row = Rect(panel.0 + 6.0, y, panel.2 - 12.0, 14.0);
                     if editor.slot == Some(slot) {
@@ -1632,20 +1697,35 @@ impl Gui {
                 }
             }
         }
-        let hint = if editor.slots {
-            "Slot filter".to_string()
-        } else {
-            format!("New rule: {}", editor.action.name())
+        let hint = match editor.tab {
+            rules_editor::Tab::Presets => format!("Condition: {}", editor.kind.name()),
+            rules_editor::Tab::Slots => "Slot filter".to_string(),
+            rules_editor::Tab::Items => format!(
+                "New rule: {} / preset: {}",
+                editor.action.name(),
+                editor.preset_label(&presets)
+            ),
         };
         l.row_label(
             panel.0 + 8.0,
             add_y - 12.0,
             12.0,
-            &hint,
+            &fit(&hint, panel.2 - 16.0, SMALL_SCALE),
             MUTED,
             SMALL_SCALE,
             Align::Left,
         );
+        match editor.tab {
+            rules_editor::Tab::Presets => l.hit(
+                Rect(panel.0 + 8.0, add_y - 12.0, panel.2 - 16.0, 12.0),
+                Hit::RulesKind,
+            ),
+            rules_editor::Tab::Items => l.hit(
+                Rect(panel.0 + 8.0, add_y - 12.0, panel.2 - 16.0, 12.0),
+                Hit::RulesPreset,
+            ),
+            rules_editor::Tab::Slots => {}
+        }
         let field = Rect(panel.0 + 8.0, add_y, panel.2 - 76.0, 14.0);
         l.rounded(field, INSET);
         let shown = if editor.item.is_empty() {
@@ -1677,10 +1757,14 @@ impl Gui {
         l.hit(field, Hit::Focus("rules.item".into(), field));
         l.button(
             Rect(panel.0 + panel.2 - 64.0, add_y, 28.0, 14.0),
-            if editor.slots { "SET" } else { "ADD" },
+            if editor.tab == rules_editor::Tab::Slots {
+                "SET"
+            } else {
+                "ADD"
+            },
             Hit::RulesAdd,
         );
-        if !editor.slots {
+        if editor.tab == rules_editor::Tab::Items {
             l.button(
                 Rect(panel.0 + panel.2 - 32.0, add_y, 24.0, 14.0),
                 "ACT",

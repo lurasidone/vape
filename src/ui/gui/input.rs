@@ -330,8 +330,13 @@ impl Gui {
                     | Hit::RulesRemove(_)
                     | Hit::RulesCycle(_)
                     | Hit::RulesProfile(_)
-                    | Hit::RulesMode(_)
+                    | Hit::RulesTab(_)
                     | Hit::RulesSlot(_)
+                    | Hit::RulesPreset
+                    | Hit::RulesPresetValue(_)
+                    | Hit::RulesNewPreset
+                    | Hit::RulesKind
+                    | Hit::RulesRemoveCondition(_)
                     | Hit::RulesAction
                     | Hit::Popup
                     | Hit::Focus(..)
@@ -689,11 +694,15 @@ impl Gui {
                 return vec![Action::Set(id, map_value(&entries))];
             }
             Hit::RulesOpen => {
-                let profiles = rules_editor::profiles(view);
+                let mut profiles = rules_editor::profiles(view);
+                self.rules_editor = Some(rules_editor::RulesEditor::new(&profiles));
                 if profiles.is_empty() {
-                    self.status = "No inventory profile to edit".into();
-                } else {
+                    profiles.push(rules_editor::default_profile());
                     self.rules_editor = Some(rules_editor::RulesEditor::new(&profiles));
+                    return vec![Action::Set(
+                        rules_editor::PROFILES.into(),
+                        json!(rules_editor::text(&profiles)),
+                    )];
                 }
             }
             Hit::RulesClose => self.rules_editor = None,
@@ -703,14 +712,54 @@ impl Gui {
                     editor.slot = None;
                 }
             }
-            Hit::RulesMode(slots) => {
+            Hit::RulesTab(tab) => {
                 if let Some(editor) = self.rules_editor.as_mut() {
-                    editor.slots = slots;
+                    editor.tab = tab;
                 }
             }
             Hit::RulesSlot(slot) => {
                 if let Some(editor) = self.rules_editor.as_mut() {
                     editor.slot = Some(slot);
+                }
+            }
+            Hit::RulesPreset => {
+                let presets = rules_editor::presets(view);
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.cycle_preset(&presets);
+                }
+            }
+            Hit::RulesPresetValue(uuid) => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.preset = Some(uuid);
+                }
+            }
+            Hit::RulesNewPreset => {
+                if let Some(mut editor) = self.rules_editor.take() {
+                    let mut presets = rules_editor::presets(view);
+                    rules_editor::add_preset(&mut presets, &mut editor);
+                    self.rules_editor = Some(editor);
+                    return vec![Action::Set(
+                        rules_editor::PRESETS.into(),
+                        json!(rules_editor::presets_text(&presets)),
+                    )];
+                }
+            }
+            Hit::RulesKind => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.cycle_kind();
+                }
+            }
+            Hit::RulesRemoveCondition(index) => {
+                if let Some(editor) = self.rules_editor.take() {
+                    let mut presets = rules_editor::presets(view);
+                    let removed = rules_editor::remove_condition(&mut presets, &editor, index);
+                    self.rules_editor = Some(editor);
+                    if removed {
+                        return vec![Action::Set(
+                            rules_editor::PRESETS.into(),
+                            json!(rules_editor::presets_text(&presets)),
+                        )];
+                    }
                 }
             }
             Hit::RulesAction => {
@@ -720,11 +769,29 @@ impl Gui {
             }
             Hit::RulesAdd => {
                 if let Some(mut editor) = self.rules_editor.take() {
+                    if editor.tab == rules_editor::Tab::Presets {
+                        let mut presets = rules_editor::presets(view);
+                        match rules_editor::add_condition(&mut presets, &editor) {
+                            Ok(()) => {
+                                editor.item.clear();
+                                self.rules_editor = Some(editor);
+                                return vec![Action::Set(
+                                    rules_editor::PRESETS.into(),
+                                    json!(rules_editor::presets_text(&presets)),
+                                )];
+                            }
+                            Err(message) => {
+                                self.status = message;
+                                self.rules_editor = Some(editor);
+                                return Vec::new();
+                            }
+                        }
+                    }
                     let mut profiles = rules_editor::profiles(view);
-                    let result = if editor.slots {
+                    let result = if editor.tab == rules_editor::Tab::Slots {
                         rules_editor::set_slot(&mut profiles, &editor)
                     } else {
-                        rules_editor::add(&mut profiles, &editor)
+                        rules_editor::add(&mut profiles, &rules_editor::presets(view), &editor)
                     };
                     match result {
                         Ok(()) => {

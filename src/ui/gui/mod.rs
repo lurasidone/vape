@@ -253,8 +253,13 @@ enum Hit {
     /// Opens the InventoryManager filter-rule editor.
     RulesOpen,
     RulesProfile(String),
-    RulesMode(bool),
+    RulesTab(rules_editor::Tab),
     RulesSlot(u8),
+    RulesPreset,
+    RulesPresetValue(String),
+    RulesNewPreset,
+    RulesKind,
+    RulesRemoveCondition(usize),
     RulesAdd,
     RulesRemove(usize),
     RulesCycle(usize),
@@ -998,6 +1003,10 @@ mod tests {
         gui.mouse("MouseLeft", false, point, view);
         actions
     }
+    fn centre(gui: &Gui, wanted: &dyn Fn(&Hit) -> bool) -> (f32, f32) {
+        let (Rect(x, y, w, h), _) = gui.hits.iter().rev().find(|(_, hit)| wanted(hit)).unwrap();
+        (x + w / 2.0, y + h / 2.0)
+    }
     #[test]
     fn navigation_opens_category_frames_whose_rows_toggle_modules() {
         let mut gui = Gui {
@@ -1054,7 +1063,7 @@ mod tests {
     }
     #[test]
     fn the_inventory_editor_adds_cycles_and_removes_item_rules() {
-        use crate::inventory::rules::{parse_profiles, Filter, Matcher};
+        use crate::inventory::rules::{parse_presets, parse_profiles, Filter, Matcher};
         let mut gui = Gui {
             open: true,
             ..Gui::default()
@@ -1092,10 +1101,6 @@ mod tests {
         // the Inventory category.
         click(&mut gui, &view, (30.0, 6.0 + NAV_HEADER_HEIGHT + 4.0 * ROW_HEIGHT + 10.0));
         gui.selected = Some("inventory.inventory-manager".into());
-        let centre = |gui: &Gui, wanted: &dyn Fn(&Hit) -> bool| {
-            let (Rect(x, y, w, h), _) = gui.hits.iter().rev().find(|(_, hit)| wanted(hit)).unwrap();
-            (x + w / 2.0, y + h / 2.0)
-        };
         gui.frame(&view, (400.0, 300.0));
         let open = centre(&gui, &|hit| matches!(hit, Hit::RulesOpen));
         assert!(click(&mut gui, &view, open).is_empty());
@@ -1142,7 +1147,10 @@ mod tests {
         // The SLOTS tab sets a hotbar slot's filter from the same field.
         view.values[rules_editor::PROFILES] = value.clone();
         gui.frame(&view, (400.0, 300.0));
-        let slots = centre(&gui, &|hit| matches!(hit, Hit::RulesMode(true)));
+        let slots = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::RulesTab(rules_editor::Tab::Slots)),
+        );
         assert!(click(&mut gui, &view, slots).is_empty());
         gui.frame(&view, (400.0, 300.0));
         let slot = centre(&gui, &|hit| matches!(hit, Hit::RulesSlot(3)));
@@ -1166,11 +1174,139 @@ mod tests {
             Filter::Item("water_bucket".into())
         );
         view.values[rules_editor::PROFILES] = value.clone();
+        // The PRESETS tab creates a preset and adds a Quantity condition.
+        gui.frame(&view, (400.0, 300.0));
+        let presets_tab = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::RulesTab(rules_editor::Tab::Presets)),
+        );
+        assert!(click(&mut gui, &view, presets_tab).is_empty());
+        gui.frame(&view, (400.0, 300.0));
+        let new = centre(&gui, &|hit| matches!(hit, Hit::RulesNewPreset));
+        let actions = click(&mut gui, &view, new);
+        let [Action::Set(id, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        assert_eq!(id, rules_editor::PRESETS);
+        view.values[rules_editor::PRESETS] = value.clone();
+        let presets = parse_presets(value.as_str().unwrap()).unwrap();
+        assert_eq!(presets.len(), 1);
+        let uuid = presets[0].uuid.clone();
+        gui.frame(&view, (400.0, 300.0));
+        let kind = centre(&gui, &|hit| matches!(hit, Hit::RulesKind));
+        for _ in 0..4 {
+            assert!(click(&mut gui, &view, kind).is_empty());
+        }
+        gui.frame(&view, (400.0, 300.0));
+        let field = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::Focus(f, _) if f == "rules.item"),
+        );
+        click(&mut gui, &view, field);
+        gui.commit_text("2", false);
+        gui.frame(&view, (400.0, 300.0));
+        let add = centre(&gui, &|hit| matches!(hit, Hit::RulesAdd));
+        let actions = click(&mut gui, &view, add);
+        let [Action::Set(id, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        assert_eq!(id, rules_editor::PRESETS);
+        view.values[rules_editor::PRESETS] = value.clone();
+        let presets = parse_presets(value.as_str().unwrap()).unwrap();
+        assert_eq!(presets[0].groups[0].conditions.len(), 1);
+        assert_eq!(
+            rules_editor::summary(&presets[0].groups[0].conditions[0]),
+            "Quantity >= 2"
+        );
+        // The new preset stays selected, so the ITEMS tab's new rule
+        // attaches it; the preset hint cycles it off and back on.
+        gui.frame(&view, (400.0, 300.0));
+        let items = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::RulesTab(rules_editor::Tab::Items)),
+        );
+        assert!(click(&mut gui, &view, items).is_empty());
+        gui.frame(&view, (400.0, 300.0));
+        let preset = centre(&gui, &|hit| matches!(hit, Hit::RulesPreset));
+        assert!(click(&mut gui, &view, preset).is_empty());
+        assert!(click(&mut gui, &view, preset).is_empty());
+        gui.frame(&view, (400.0, 300.0));
+        let field = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::Focus(f, _) if f == "rules.item"),
+        );
+        click(&mut gui, &view, field);
+        gui.commit_text("any-food", false);
+        gui.frame(&view, (400.0, 300.0));
+        let add = centre(&gui, &|hit| matches!(hit, Hit::RulesAdd));
+        let actions = click(&mut gui, &view, add);
+        let [Action::Set(id, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        assert_eq!(id, rules_editor::PROFILES);
+        let parsed = parse_profiles(value.as_str().unwrap(), &presets).unwrap();
+        assert_eq!(
+            parsed[0].items.last().unwrap().shared.as_deref(),
+            Some(uuid.as_str())
+        );
         // The cross closes the editor; Escape also does.
         gui.frame(&view, (400.0, 300.0));
         let close = centre(&gui, &|hit| matches!(hit, Hit::RulesClose));
         assert!(click(&mut gui, &view, close).is_empty());
         assert!(gui.rules_editor.is_none());
+    }
+
+    #[test]
+    fn opening_the_editor_with_no_profiles_creates_the_default() {
+        use crate::inventory::rules::parse_profiles;
+        let mut gui = Gui {
+            open: true,
+            ..Gui::default()
+        };
+        let mut view = view();
+        view.values = json!({
+            "client.search-bar": "Integrated",
+            rules_editor::PROFILES: "",
+            rules_editor::PRESETS: "[]",
+        });
+        view.modules.push(ModuleView {
+            id: "inventory.inventory-manager".into(),
+            name: "InventoryManager".into(),
+            category: "Inventory".into(),
+            enabled: true,
+            favorite: false,
+            visible: true,
+        });
+        view.definitions = vec![
+            Definition::new(
+                rules_editor::PROFILES,
+                "Inventory",
+                Kind::Text { max_chars: 4096 },
+                json!(""),
+            ),
+            Definition::new(
+                rules_editor::PRESETS,
+                "Presets",
+                Kind::Text { max_chars: 4096 },
+                json!("[]"),
+            ),
+        ];
+        click(&mut gui, &view, (30.0, 6.0 + NAV_HEADER_HEIGHT + 4.0 * ROW_HEIGHT + 10.0));
+        gui.selected = Some("inventory.inventory-manager".into());
+        gui.frame(&view, (400.0, 300.0));
+        let open = centre(&gui, &|hit| matches!(hit, Hit::RulesOpen));
+        let actions = click(&mut gui, &view, open);
+        let [Action::Set(id, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        assert_eq!(id, rules_editor::PROFILES);
+        let parsed = parse_profiles(value.as_str().unwrap(), &[]).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].name, "Inventory #1");
+        assert_eq!(
+            gui.rules_editor.as_ref().unwrap().profile,
+            "Inventory #1"
+        );
     }
 
     #[test]

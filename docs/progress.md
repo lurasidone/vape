@@ -3167,3 +3167,18 @@ scenario is focus-blocked offscreen (see decisions), and the host build is
 blocked in this environment: `horizon-rust/horizon-mixins` returns 404 and the
 local `../horizon` source marker no longer matches the pin, so the editor is
 integrated/unit-tested, not host-validated.
+## 2026-11-26: InventoryManager preset conditions
+The editor's PRESETS tab creates a preset (a unique uuid, "Rule #n"), lists its
+first AND group's conditions and adds one from a kind (durability, attack
+damage, enchantment, potion effect, quantity, display/item name, material,
+lore) with one value and the common comparison (greater-or-equal for numbers,
+contains for text, a material list). The cross removes a condition. The item
+tab's preset hint cycles the custom rule (None and each preset); a new rule
+references the selected preset by uuid, resolved from the presets setting. The
+reference's operators, several texts and multiple AND/OR groups remain. Opening
+the editor with the default empty profiles setting creates the reference's
+"Inventory #1" profile, so the editor is usable from a fresh config.
+`cargo test --offline --lib` passes 512 tests (the preset model, the rule's
+custom-rule uuid round-trip and the click-GUI NEW/KIND/ADD/preset paths). The
+host build remains blocked (the horizon-rust 404 and the older xtask source
+pin), so this is implemented-core/unit-tested, not host-validated.
