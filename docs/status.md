@@ -78,8 +78,9 @@ some hook points moved. Current full build: `native-f1bb66f-76d3241d8036`.
   every 50 ticks (100 x/z, ±20 y, one half per pair), and the overlay
   projects their centres into the 20x20 reticle while the tick maintains
   the target list with a host `WorldView`; the block crosshair claims a
-  target within 4.5 blocks and the entity pick is suppressed. The break
-  rotation/movement and indicator renderer remain.
+  target within 4.5 blocks and the entity pick is suppressed; the overlay
+  draws a per-target box, highlights the chosen one and shows the Hypixel
+  cover's tool. The Hypixel break rotation/movement remains.
 - **Not started modules** (CrystalAura, AutoAnchor, Block-In, the
   InventoryManager filter-rule editor, translations/fonts) can resume: the
   exact reference `3d600a48` / `4.21.43` is cloned at the sibling

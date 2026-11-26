@@ -63,6 +63,9 @@ impl BedBreaker {
             .map(|state| state.position.block())
             .collect()
     }
+    pub fn targets(&self) -> &[BedTargetRenderState] {
+        &self.targets
+    }
     pub fn inside(&self) -> Vec<bool> {
         self.targets.iter().map(|state| state.inside_reticle).collect()
     }

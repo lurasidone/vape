@@ -2958,3 +2958,11 @@ crosshair returns that block (top face), and the entity pick is suppressed
 for the target. `cargo check --offline` and the native build
 (`native-f1bb66f-8bfb7219b4ae`) pass. The break rotation/movement fix and
 the indicator renderer remain.
+
+## 2026-11-26: BedBreaker indicator
+
+The overlay draws a per-target box at the projected bed centre, scaled by
+the block size and the visibility animation; the chosen target is yellow,
+and an active Hypixel cover shows its tool icon. `cargo check --offline`
+and the native build (`native-f1bb66f-cf4d9c23e0cc`) pass. The Hypixel
+break rotation/movement fix remains.

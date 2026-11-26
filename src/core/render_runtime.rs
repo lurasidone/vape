@@ -2,8 +2,8 @@
 // HUD-time overlay (ESP 2D and the other screen-space modules) and ESP's
 // Outline colours.
 use super::super::modules::render::{
-    arrows, bed_plates, block_overlay, center_stack, esp, explosions, health, indicators,
-    name_tags, overlay, projectiles, search, spawner_finder,
+    arrows, bed_breaker, bed_plates, block_overlay, center_stack, esp, explosions, health,
+    indicators, name_tags, overlay, projectiles, search, spawner_finder,
 };
 use super::super::targeting::entities::EntityView;
 use super::{ModuleId, Runtime};
@@ -18,6 +18,7 @@ impl Runtime {
                 ModuleId::SpawnerFinder,
                 ModuleId::Indicators,
                 ModuleId::BedPlates,
+                ModuleId::BedBreaker,
             ]
             .into_iter()
             .any(|id| self.enabled(id))
@@ -80,6 +81,9 @@ impl Runtime {
         }
         if self.enabled(ModuleId::BedPlates) {
             out.extend(bed_plates::draws(&self.settings, frame, &frame.bed_plates));
+        }
+        if self.enabled(ModuleId::BedBreaker) {
+            out.extend(bed_breaker::draws(&self.bed_breaker, frame));
         }
         if self.enabled(ModuleId::Indicators) {
             out.extend(indicators::draws(&self.settings, frame, &frame.indicators));

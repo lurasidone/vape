@@ -4,6 +4,7 @@ pub mod world;
 
 pub mod anti_debuff;
 pub mod arrows;
+pub mod bed_breaker;
 pub mod bed_plates;
 pub mod block_overlay;
 pub mod center_stack;
