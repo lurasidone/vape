@@ -338,6 +338,8 @@ impl Gui {
                     | Hit::RulesKind
                     | Hit::RulesRemoveCondition(_)
                     | Hit::RulesConditionOp(_)
+                    | Hit::RulesGroup(_)
+                    | Hit::RulesNewGroup
                     | Hit::RulesAction
                     | Hit::Popup
                     | Hit::Focus(..)
@@ -810,6 +812,31 @@ impl Gui {
                             json!(rules_editor::presets_text(&presets)),
                         )];
                     }
+                }
+            }
+            Hit::RulesGroup(index) => {
+                if let Some(editor) = self.rules_editor.as_mut() {
+                    editor.group = index;
+                }
+            }
+            Hit::RulesNewGroup => {
+                if let Some(mut editor) = self.rules_editor.take() {
+                    let mut presets = match rules_editor::parse_presets_setting(view) {
+                        Ok(presets) => presets,
+                        Err(message) => {
+                            self.status = format!("Invalid inventory presets: {message}");
+                            self.rules_editor = Some(editor);
+                            return Vec::new();
+                        }
+                    };
+                    if rules_editor::add_group(&mut presets, &mut editor) {
+                        self.rules_editor = Some(editor);
+                        return vec![Action::Set(
+                            rules_editor::PRESETS.into(),
+                            json!(rules_editor::presets_text(&presets)),
+                        )];
+                    }
+                    self.rules_editor = Some(editor);
                 }
             }
             Hit::RulesAction => {

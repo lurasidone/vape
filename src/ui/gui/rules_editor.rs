@@ -103,15 +103,15 @@ impl ConditionKind {
             },
             Self::DisplayName => Condition::DisplayName {
                 mode: TextMode::Contains,
-                texts: vec![value.into()],
+                texts: texts(value),
             },
             Self::ItemName => Condition::ItemName {
                 mode: TextMode::Contains,
-                texts: vec![value.into()],
+                texts: texts(value),
             },
             Self::Lore => Condition::Lore {
                 mode: TextMode::Contains,
-                texts: vec![value.into()],
+                texts: texts(value),
             },
             Self::Material => Condition::Material {
                 include: true,
@@ -128,6 +128,16 @@ impl ConditionKind {
 fn unprefixed(id: &str) -> String {
     let id = id.trim().to_ascii_lowercase();
     id.strip_prefix("minecraft:").unwrap_or(&id).to_string()
+}
+
+/// Splits the editor's comma-separated text into the condition's entries.
+fn texts(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .collect()
 }
 
 /// A one-line description of a saved condition for the preset list.
@@ -190,9 +200,11 @@ pub fn summary(condition: &Condition) -> String {
 /// Cycles a condition's comparison: numeric operators, text modes or the
 /// material include flag.
 pub fn cycle_operator(presets: &mut [Preset], editor: &RulesEditor, index: usize) -> bool {
+    if !editor.has_group(presets) {
+        return false;
+    }
     let Some(condition) = editor
-        .selected_preset_mut(presets)
-        .and_then(|p| p.groups.first_mut())
+        .selected_group_mut(presets)
         .and_then(|g| g.conditions.get_mut(index))
     else {
         return false;
@@ -237,6 +249,8 @@ pub struct RulesEditor {
     /// The selected preset's uuid: the preset tab's target and the new item
     /// rule's custom rule.
     pub preset: Option<String>,
+    /// The selected AND group of the preset (OR groups across the preset).
+    pub group: usize,
     /// The kind of the next preset condition.
     pub kind: ConditionKind,
 }
@@ -250,6 +264,7 @@ impl RulesEditor {
             tab: Tab::Items,
             slot: None,
             preset: None,
+            group: 0,
             kind: ConditionKind::Durability,
         }
     }
@@ -286,6 +301,22 @@ impl RulesEditor {
             return Some(&mut presets[index]);
         }
         presets.first_mut()
+    }
+
+    /// The selected group, creating empty groups up to it (the editor's NEW
+    /// group path is the only other creator).
+    fn selected_group_mut<'a>(&self, presets: &'a mut [Preset]) -> Option<&'a mut ConditionGroup> {
+        let group = self.group;
+        let preset = self.selected_preset_mut(presets)?;
+        while preset.groups.len() <= group {
+            preset.groups.push(ConditionGroup::default());
+        }
+        preset.groups.get_mut(group)
+    }
+
+    fn has_group(&self, presets: &[Preset]) -> bool {
+        self.selected_preset(presets)
+            .is_some_and(|p| self.group < p.groups.len())
     }
 
     pub fn preset_label(&self, presets: &[Preset]) -> String {
@@ -431,27 +462,38 @@ pub fn add_preset(presets: &mut Vec<Preset>, editor: &mut RulesEditor) {
         groups: Vec::new(),
     });
     editor.preset = Some(uuid);
+    editor.group = 0;
 }
 
 /// Adds the editor's kind/value as a condition in the selected preset's first
 /// group (created on demand).
 pub fn add_condition(presets: &mut [Preset], editor: &RulesEditor) -> Result<(), String> {
     let condition = editor.kind.build(&editor.item)?;
-    let preset = editor
-        .selected_preset_mut(presets)
+    let group = editor
+        .selected_group_mut(presets)
         .ok_or("Create a preset first")?;
-    if preset.groups.is_empty() {
-        preset.groups.push(ConditionGroup::default());
-    }
-    preset.groups[0].conditions.push(condition);
+    group.conditions.push(condition);
     Ok(())
 }
 
+/// Adds an empty AND group to the selected preset and selects it.
+pub fn add_group(presets: &mut [Preset], editor: &mut RulesEditor) -> bool {
+    let len = match editor.selected_preset_mut(presets) {
+        Some(preset) => {
+            preset.groups.push(ConditionGroup::default());
+            preset.groups.len()
+        }
+        None => return false,
+    };
+    editor.group = len - 1;
+    true
+}
+
 pub fn remove_condition(presets: &mut [Preset], editor: &RulesEditor, index: usize) -> bool {
-    let Some(group) = editor
-        .selected_preset_mut(presets)
-        .and_then(|p| p.groups.first_mut())
-    else {
+    if !editor.has_group(presets) {
+        return false;
+    }
+    let Some(group) = editor.selected_group_mut(presets) else {
         return false;
     };
     if index < group.conditions.len() {
@@ -575,6 +617,20 @@ mod tests {
         assert_eq!(summary(&presets[0].groups[0].conditions[0]), "Quantity less than 2");
         assert!(remove_condition(&mut presets, &editor, 1));
         assert_eq!(presets[0].groups[0].conditions.len(), 1);
+        // A second AND group takes its own conditions; a text condition
+        // splits its comma-separated entries.
+        assert!(add_group(&mut presets, &mut editor));
+        assert_eq!(editor.group, 1);
+        editor.kind = ConditionKind::ItemName;
+        editor.item = "apple, golden apple".into();
+        add_condition(&mut presets, &editor).unwrap();
+        assert_eq!(presets[0].groups[1].conditions.len(), 1);
+        assert_eq!(
+            summary(&presets[0].groups[1].conditions[0]),
+            "Item name contains apple, golden apple"
+        );
+        assert!(remove_condition(&mut presets, &editor, 0));
+        assert!(presets[0].groups[1].conditions.is_empty());
         // The rule's custom rule is the selected preset's uuid.
         let mut list = profiles();
         editor.tab = Tab::Items;

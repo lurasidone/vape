@@ -1597,13 +1597,44 @@ impl Gui {
             }
         }
         let add_y = panel.1 + panel.3 - 30.0;
-        let mut y = panel.1 + 38.0;
+        let mut y = if editor.tab == rules_editor::Tab::Presets {
+            panel.1 + 52.0
+        } else {
+            panel.1 + 38.0
+        };
         if editor.tab == rules_editor::Tab::Presets {
             if let Some(preset) = editor.selected_preset(&presets) {
+                let mut gx = panel.0 + 8.0;
+                for i in 0..preset.groups.len() {
+                    let label = format!("G{}", i + 1);
+                    let tab = Rect(gx, panel.1 + 38.0, text_width(&label) + 10.0, 12.0);
+                    if tab.0 + tab.2 > panel.0 + panel.2 - 44.0 {
+                        break;
+                    }
+                    if editor.group == i {
+                        l.rounded(tab, PRESSED);
+                    }
+                    l.row_label(
+                        tab.0 + 4.0,
+                        tab.1,
+                        tab.3,
+                        &label,
+                        if editor.group == i { self.accent } else { MUTED },
+                        SMALL_SCALE,
+                        Align::Left,
+                    );
+                    l.hit(tab, Hit::RulesGroup(i));
+                    gx += tab.2 + 4.0;
+                }
+                l.button(
+                    Rect(panel.0 + panel.2 - 36.0, panel.1 + 37.0, 30.0, 13.0),
+                    "+G",
+                    Hit::RulesNewGroup,
+                );
                 let room = ((add_y - y) / 15.0).floor().max(0.0) as usize;
                 let conditions = preset
                     .groups
-                    .first()
+                    .get(editor.group)
                     .map(|g| g.conditions.as_slice())
                     .unwrap_or(&[]);
                 for (i, condition) in conditions.iter().enumerate().take(room) {

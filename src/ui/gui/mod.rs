@@ -261,6 +261,8 @@ enum Hit {
     RulesKind,
     RulesRemoveCondition(usize),
     RulesConditionOp(usize),
+    RulesGroup(usize),
+    RulesNewGroup,
     RulesAdd,
     RulesRemove(usize),
     RulesCycle(usize),
@@ -1232,6 +1234,46 @@ mod tests {
         assert_eq!(
             rules_editor::summary(&presets[0].groups[0].conditions[0]),
             "Quantity less than 2"
+        );
+        // A second AND group takes its own text condition.
+        gui.frame(&view, (400.0, 300.0));
+        let new_group = centre(&gui, &|hit| matches!(hit, Hit::RulesNewGroup));
+        let actions = click(&mut gui, &view, new_group);
+        let [Action::Set(id, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        assert_eq!(id, rules_editor::PRESETS);
+        view.values[rules_editor::PRESETS] = value.clone();
+        let presets = parse_presets(value.as_str().unwrap()).unwrap();
+        assert_eq!(presets[0].groups.len(), 2);
+        gui.frame(&view, (400.0, 300.0));
+        let group2 = centre(&gui, &|hit| matches!(hit, Hit::RulesGroup(1)));
+        assert!(click(&mut gui, &view, group2).is_empty());
+        gui.frame(&view, (400.0, 300.0));
+        let kind = centre(&gui, &|hit| matches!(hit, Hit::RulesKind));
+        for _ in 0..2 {
+            assert!(click(&mut gui, &view, kind).is_empty());
+        }
+        gui.frame(&view, (400.0, 300.0));
+        let field = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::Focus(f, _) if f == "rules.item"),
+        );
+        click(&mut gui, &view, field);
+        gui.commit_text("apple, golden apple", false);
+        gui.frame(&view, (400.0, 300.0));
+        let add = centre(&gui, &|hit| matches!(hit, Hit::RulesAdd));
+        let actions = click(&mut gui, &view, add);
+        let [Action::Set(id, value)] = &actions[..] else {
+            panic!("{actions:?}");
+        };
+        assert_eq!(id, rules_editor::PRESETS);
+        view.values[rules_editor::PRESETS] = value.clone();
+        let presets = parse_presets(value.as_str().unwrap()).unwrap();
+        assert_eq!(presets[0].groups[1].conditions.len(), 1);
+        assert_eq!(
+            rules_editor::summary(&presets[0].groups[1].conditions[0]),
+            "Item name contains apple, golden apple"
         );
         // The new preset stays selected, so the ITEMS tab's new rule
         // attaches it; the preset hint cycles it off and back on.
