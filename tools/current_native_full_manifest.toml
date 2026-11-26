@@ -17,7 +17,7 @@ mixins = "e59da9094f0c2fdda6c627fe9eff22dec6a906f0"
 id = "client-tick"
 target = "horizon_client::game::Game<'_>::tick"
 kind = "HEAD"
-helper = "src/adapters/current_tick.rs"
+helper = "src/adapters/tick.rs"
 bindings = [{ name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" }]
 
 [[native.mixin]]

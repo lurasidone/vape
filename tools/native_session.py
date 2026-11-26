@@ -136,9 +136,13 @@ class NativeSession:
         if self.process is not None:
             raise RuntimeError('close the owned process before restarting')
         args = [str(self.binary), '--resources', str(self.resources),
-                *(('--world', world) if world else ()), '--offscreen', '--width', '800', '--height', '600',
+                *(('--world', world) if world else ()), '--width', '800', '--height', '600',
                 '--render-distance', '2', '--no-pause', '--control-socket', str(self.socket),
                 *extra]
+        # Input-delay modules gate on `game.focused`; an offscreen window never
+        # gets it. VAPE_RS_VISIBLE=1 opens a real window for those scenarios.
+        if os.environ.get('VAPE_RS_VISIBLE') != '1':
+            args.append('--offscreen')
         if creative:
             args.append('--creative')
         self.socket.unlink(missing_ok=True)
@@ -155,6 +159,12 @@ class NativeSession:
             time.sleep(0.1)
         self.call('wait-ready', '40')
         self.call('wait', '2')
+        if os.environ.get('VAPE_RS_VISIBLE') == '1':
+            # The input-delay modules gate on game.focused; focus the window
+            # under the Sway session the scenarios run in.
+            subprocess.run(['swaymsg', '[app_id=horizon] focus'], text=True,
+                           capture_output=True)
+            time.sleep(0.3)
 
     def close(self):
         if self.process is None:

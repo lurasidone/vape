@@ -2795,3 +2795,22 @@ the version's `native-mods.json` as the build identity and takes the prepared
 `VAPE_RS_BUILD=launcher` paths are unchanged. This is the fast path to re-run
 the existing scenario tools against the signed SDK instead of rebuilding or
 re-deriving the old-pin evidence; no module code changed.
+
+## 2026-11-26: the current SDK candidate now dispatches its modules
+
+The full manifest still bound `client-tick` to `adapters/current_tick.rs`, a
+HUD-smoke helper that only observes the runtime; none of the gameplay
+dispatchers (`vape_input_delays::movement`, `vape_world_actions::tick`,
+`vape_combat::movement_tick`, the inventory/aura/pearl/freecam ticks) ran.
+Switched the row to the full `adapters/tick.rs`; it compiles against the
+signed SDK and selects build `native-f1bb66f-eb38e767897e`. This is why the
+first smoke run failed Sprint/Parkour: they were never ticked.
+
+Smoke on that build (`VAPE_RS_SDK_VERSION`, visible window, 26/27 checks):
+**24/27**. Sprint (including the controller-held case), Parkour, the
+inventory/AutoArmor/AutoTotem paths, death/respawn and the log checks pass.
+The three failures are all after the pause menu: Sprint does not re-press on
+resume, F10 Panic does not disable, and the synthetic sprint stays held.
+These need a focused-window/menu-path check, not the old offscreen harness.
+`tools/native_session.py` now has `VAPE_RS_VISIBLE=1` (real window plus a Sway
+focus) for the input-gated scenarios; the offscreen path is unchanged.
