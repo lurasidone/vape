@@ -3226,3 +3226,13 @@ frame behind (the avatar catches up next tick). The movement scenario on
 the Fly rise/hover/0.5-per-tick checks, Speed Bhop and LongJump pass; the two
 fails are the pre-existing AntiFall bind and lagback checks (a separate
 module, unchanged here).
+
+## 2026-11-26: CrystalAura host loop
+The full auto loop runs on the host: the rotation is claimed and aimed at
+the interaction point above the selector's base, the carried slot switches to
+an end crystal, the placement click fires once the crosshair reaches the
+block, and the break action lands on the tracked crystal, all behind the
+reference's activation/action delays and the placement timeout. The crystal
+aura scenario on `native-f1bb66f-492bff3b2224` (fresh home,
+`crystal-aura-hk7ycrxa`) passes 7/7: the crystal is placed, explodes on the
+target (10.0 -> 0.0) and the player survives the blast.
