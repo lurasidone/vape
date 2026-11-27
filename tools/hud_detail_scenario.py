@@ -11,12 +11,13 @@ captures next to it.
 import argparse
 import json
 from pathlib import Path
+import gui_layout
 from native_session import NativeSession
 from smoke_scenario import Checks, inventory
 
 
 def run(resources):
-    with NativeSession(resources, 'hud-details-') as session:
+    with NativeSession(resources, 'hud-details-', size=(800, 760)) as session:
         session.seed({'schema': 1, 'modules': {'hud.coordinates': {'enabled': True},
                       'hud.fps': {'enabled': True}, 'hud.compass': {'enabled': True}},
                       'settings': {'hud.coordinates.display': 'vertical',
@@ -25,6 +26,9 @@ def run(resources):
                                    # The control socket has no right-shift alias.
                                    'client.gui.binds': ['ShiftLeft']}})
         session.launch()
+        # The HUD editor lays out in logical units from gui_layout; pin the
+        # scale the model assumes instead of the auto choice.
+        session.call('options-set', 'guiScale', '2')
         for yaw, label in [(-180, 'north'), (-90, 'east'), (0, 'south'), (90, 'west')]:
             session.call('look', str(yaw), '0')
             session.call('wait', '2')
@@ -36,19 +40,27 @@ def run(resources):
         assert session.saved()['modules']['hud.compass']['enabled'] is False
         session.call('key', 'shift', 'tap')
         session.capture('gui')
-        # HUD modules are listed by name in the HUD editor's centred frame.
-        session.call('click-at', '107', '232')
+        # HUD modules are listed by name in the HUD editor's centred frame
+        # (render.rs hud_body), sorted by id like the category frames.
+        session.call('click-at', '107', '232')  # navigation footer HUD icon
         session.capture('legit-modules')
-        session.call('click-at', '190', '86')  # Compass, third HUD row
+        compass = gui_layout.hud_row('hud.compass')
+        session.call('click-at', *map(str, compass))
         session.capture('compass-enabled-in-gui')
         assert session.saved()['modules']['hud.compass']['enabled'] is True
-        session.call('click-at', '247', '46')  # Coords dots expand its settings
+        coords = gui_layout.hud_row('hud.coordinates')
+        session.call('click-at', *map(str, gui_layout.hud_dots('hud.coordinates')))
         session.capture('coordinate-settings')
-        session.call('click-at', '200', '65')  # Display Type, first setting
-        session.call('click-at', '180', '95')  # horizontal, second option
+        # Settings iterate in id order (settings.rs BTreeMap): activation,
+        # background, binds and color are 18 high, then display is the fifth
+        # row (centre +91 from the module row's centre).
+        display = (coords[0], coords[1] + 91)
+        session.call('click-at', *map(str, display))
+        session.capture('display-choice')
+        # The first popup option is horizontal (core/mod.rs definition order).
+        session.call('click-at', str(display[0]), str(display[1] + 16))
         session.capture('horizontal-selected')
         assert session.saved()['settings']['hud.coordinates.display'] == 'horizontal'
-        session.call('click-at', '26', '287')  # BACK
         session.call('key', 'shift', 'tap')
         session.capture('horizontal-biome')
         session.close()

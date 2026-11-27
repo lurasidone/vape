@@ -79,7 +79,9 @@ def verify_build(allow_stale=False):
 
 
 class NativeSession:
-    def __init__(self, resources, prefix='scenario-', allow_stale=False, plain=False):
+    def __init__(self, resources, prefix='scenario-', allow_stale=False, plain=False,
+                 size=(800, 600)):
+        self.size = size
         if plain:
             # No vape-rs: the pristine pinned host, built with the same profile.
             self.binary, self.ctl = PLAIN / 'horizon-client', PLAIN / 'horizon-ctl'
@@ -156,7 +158,8 @@ class NativeSession:
         if self.process is not None:
             raise RuntimeError('close the owned process before restarting')
         args = [str(self.binary), '--resources', str(self.resources),
-                *(('--world', world) if world else ()), '--width', '800', '--height', '600',
+                *(('--world', world) if world else ()), '--width', str(self.size[0]),
+                '--height', str(self.size[1]),
                 '--render-distance', '2', '--no-pause', '--control-socket', str(self.socket),
                 *extra]
         # Input-delay modules gate on `game.focused`; an offscreen window never

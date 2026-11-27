@@ -3251,3 +3251,28 @@ four directions) and disables itself when the enclosure is complete. The
 block-in scenario on `native-f1bb66f-492bff3b2224` (fresh home,
 `block-in-65yehjn1`) passes 7/7: all eight walls are placed, the module
 disables, and the player still stands in the enclosure.
+
+## 2026-11-26: render failure triage
+With `--part all` on `native-f1bb66f-492bff3b2224` (`render-sp-orkuhesa`,
+`render-host-djp8ag5z`, `render-guest-epv5dfnd`) 4 of the render checks
+still fail, and their captures say why:
+- search: the highlights draw (two magenta specks beside the stone cube),
+  but the ores sit inside the cube, the check counts whole-frame magenta,
+  and clouds/chat/tutorial toast move between the on and off frames.
+- trajectories-bow-block: no arc is drawn for a block target at all (the
+  mob and crossbow arcs pass); the 2841 changed pixels are the held bow
+  bobbing and drifting clouds.
+- tracers: the guest frame shows the host player with no line; no
+  (0,150,255) pixel exists anywhere in any view.
+- indicators Hit Only: the capture is 1 tick after the summon, the arrow
+  still 11 blocks behind the player; no red marker in the ring box.
+
+## 2026-11-26: HUD detail scenario on the layout model
+The fixed clicks in `tools/hud_detail_scenario.py` were a pin behind: the
+HUD editor's centred frame lists modules from y=42 and expanded settings
+iterate in id order. The scenario now takes the Compass row and Coords
+dots from `gui_layout`, the display choice from the settings order
+(activation, background, binds, color, then display at +91), and runs its
+window 160 px taller so the choice popup stays on screen; `NativeSession`
+takes an optional size. Details 7/7 (`hud-details-ywfva5n0` assertions)
+and layouts 8/8 (`hud-layouts-7pp01slc`) on `native-f1bb66f-492bff3b2224`.
