@@ -3244,3 +3244,10 @@ anchor scenario on `native-f1bb66f-492bff3b2224` (fresh home,
 `auto-anchor-i4fmhib6`) passes 8/8: the anchor is placed (the base reads
 air), detonates with the module finishing disabled, and the player survives
 the blast.
+
+## 2026-11-26: Block-In host loop
+The module places the eight enclosure walls around the player (two levels,
+four directions) and disables itself when the enclosure is complete. The
+block-in scenario on `native-f1bb66f-492bff3b2224` (fresh home,
+`block-in-65yehjn1`) passes 7/7: all eight walls are placed, the module
+disables, and the player still stands in the enclosure.
