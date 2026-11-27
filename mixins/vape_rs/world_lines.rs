@@ -363,12 +363,14 @@ pub(crate) fn fishing_line(game: &Game<'_>, alpha: f64, size: [u32; 2]) -> Contr
         crate::game::glowing::vape_esp_outline::set(Default::default());
     }
     if !storage_on && !entities_on && !scene_on && !explosions_on && !overlay_on {
+        crate::game::fishing::vape_on_top::stash(Vec::new());
         return ControlFlow::Continue(());
     }
     // The first-person eye at the camera's partial tick, as `camera_view`
     // starts from (that needs `&mut Game`; third-person offsets are not
     // applied, matching the reference's tracer origin at the player's eye).
     let Some(player) = game.player.as_ref() else {
+        crate::game::fishing::vape_on_top::stash(Vec::new());
         return ControlFlow::Continue(());
     };
     let t = game.clock.camera_fraction();
@@ -490,14 +492,28 @@ pub(crate) fn fishing_line(game: &Game<'_>, alpha: f64, size: [u32; 2]) -> Contr
     } else {
         search_found(game, None);
     }
-    // A negative width marks a line for the always-on-top pass, so these
-    // show through walls (see the `vape_on_top` gizmos module).
-    lines.extend(extra.into_iter().map(|l| Line {
-        start: l.start.0,
-        end: l.end.0,
-        color: l.color,
-        width: -l.width,
-    }));
+    // These show through walls: the debug-gizmos hook appends them to the
+    // frame's always-on-top gizmo set (see the `vape_on_top` module). A line
+    // starting at NaN (Tracers, Search's tracers) starts one block in front
+    // of this frame's camera.
+    let through = extra
+        .into_iter()
+        .map(|l| Line {
+            start: if l.start.0[0].is_nan() {
+                [
+                    camera.eye[0] + camera.look[0],
+                    camera.eye[1] + camera.look[1],
+                    camera.eye[2] + camera.look[2],
+                ]
+            } else {
+                l.start.0
+            },
+            end: l.end.0,
+            color: l.color,
+            width: l.width,
+        })
+        .collect();
+    crate::game::fishing::vape_on_top::stash(through);
     // Explosions' blast rings and Block Overlay's outline stay depth-tested
     // (the reference keeps the depth test on).
     if explosions_on || overlay_on {

@@ -55,8 +55,18 @@ def red(path, box):
 
 
 def near(path, rgb, tolerance=40):
+    """Pixels within `tolerance` of `rgb` in every channel; a wide tolerance
+    still matches a line MSAA blends into its background."""
     image = Image.open(path).convert('RGB')
     return sum(1 for p in pixels(image) if all(abs(p[i] - rgb[i]) <= tolerance for i in range(3)))
+
+
+def drawn(a, b, rgb, tolerance=40):
+    """Pixels near `rgb` in `a` whose counterpart in `b` is not: what the
+    module painted in its colour, without the scene's own near-white clouds."""
+    on, off = (Image.open(p).convert('RGB') for p in (a, b))
+    match = lambda p: all(abs(p[i] - rgb[i]) <= tolerance for i in range(3))
+    return sum(1 for p, q in zip(pixels(on), pixels(off)) if match(p) and not match(q))
 
 
 def crop(path, box, out, zoom=4):
@@ -82,7 +92,7 @@ class Toggler:
         self.session.call('key', self.binds[module], 'tap')
         self.session.call('wait', '3')
 
-    def compare(self, module, label, views, minimum=200, rgb=None, wait=6):
+    def compare(self, module, label, views, minimum=200, rgb=None, wait=6, tolerance=40):
         """In each view, capture with the module on, then off; check every
         view's frames differ (by a quarter as much in the far views)."""
         root, failed, details = self.session.root, [], {}
@@ -100,8 +110,10 @@ class Toggler:
             detail = {'changed': pixels}
             ok = states['on'] and not states['off'] and pixels >= (max(20, minimum // 4) if far else minimum)
             if rgb is not None:
-                detail['colour-on'], detail['colour-off'] = near(frames['on'], rgb), near(frames['off'], rgb)
-                ok = ok and detail['colour-on'] > detail['colour-off'] + (10 if far else 50)
+                detail['colour-on'] = near(frames['on'], rgb, tolerance)
+                detail['colour-off'] = near(frames['off'], rgb, tolerance)
+                detail['colour-drawn'] = drawn(frames['on'], frames['off'], rgb, tolerance)
+                ok = ok and detail['colour-drawn'] > (10 if far else 50)
             details[name] = detail
             if not ok:
                 failed.append(name)
@@ -185,13 +197,22 @@ def single_player(resources, allow_stale, results):
         t.compare('render.storage-esp', 'storage-esp', views(s, (0.5, 100.5, 4.5), NEAR, FAR))
         clear(-1, 100, 4, 1, 100, 4)
 
-        # Behind a stone wall, so only Search shows them; the diamond ore
-        # has a tracer, the emerald ore not.
+        # The diamond ore sits on the wall's near face (its tracer and box
+        # show against the sky); the emerald ore is fully enclosed and has no
+        # tracer, so only the through-wall pass draws its green box.
         s.call('fill', '-4', '100', '6', '-2', '102', '8', 'minecraft:stone')
-        s.call('fill', '-3', '101', '7', '-3', '101', '7', 'minecraft:diamond_ore')
+        s.call('fill', '-3', '101', '6', '-3', '101', '6', 'minecraft:diamond_ore')
         s.call('fill', '-3', '100', '7', '-3', '100', '7', 'minecraft:emerald_ore')
         s.call('wait', '6')
-        t.compare('render.search', 'search', views(s, (-2.5, 101, 7.5), NEAR, FAR), rgb=(255, 0, 255), wait=20)
+        details = t.compare('render.search', 'search', views(s, (-2.5, 101, 7.5), NEAR, FAR),
+                            rgb=(255, 0, 255), wait=20, tolerance=90)
+        green = {
+            name: (near(s.root / f'search-{name}-on.png', (0, 255, 0), 90),
+                   near(s.root / f'search-{name}-off.png', (0, 255, 0), 90))
+            for name in details
+        }
+        checks.check('search: the enclosed emerald ore shows through the wall',
+                     all(on > off + 20 for on, off in green.values()), {'green': green})
         clear(-4, 100, 6, -2, 102, 8)
 
         s.call('command', 'setblock 3 100 6 minecraft:spawner{SpawnData:{entity:{id:"minecraft:zombie"}}}')

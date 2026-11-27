@@ -3283,3 +3283,35 @@ dots from `gui_layout`, the display choice from the settings order
 window 160 px taller so the choice popup stays on screen; `NativeSession`
 takes an optional size. Details 7/7 (`hud-details-ywfva5n0` assertions)
 and layouts 8/8 (`hud-layouts-7pp01slc`) on `native-f1bb66f-492bff3b2224`.
+
+## 2026-11-27: through-wall lines, the HUD overlay and the render checks
+The prebuilt game route (the launcher's `native-build`, the player route) only
+mirrors support modules into game-crate files, and a helper for a
+library-crate target compiles in the library patch crate with no `crate::game`;
+the old `camera_relative` hook and its `vape_on_top` state could not exist
+there, so every through-wall line was drawn depth-tested with a negative width
+and a NaN `VIEW_CENTRE` start was projected as NaN. Both passes now live in
+the game crate: the world-lines hook keeps StorageESP, ESP, Tracers,
+Trajectories, Search, PropHunt and Projectiles lines in `vape_on_top` (hosted
+in `game/fishing.rs`) and resolves a NaN start to one block in front of the
+frame's eye, and a RETURN hook on `Game::debug_gizmos` appends them to the
+frame's always-on-top gizmo set; Explosions' rings and Block Overlay's outline
+stay depth-tested. The overlay builds its frame camera from `Game::camera_view`
+at the partial tick instead of the gizmos pass's recorded camera. The SDK
+manifest gained the `on-top` and `overlay` modules and their hooks, and two
+overlay compile errors were fixed (`ItemStack::has_foil(Some(false))`,
+`CameraType::is_first_person`).
+
+`tools/render_scenario.py --part all` on `native-f1bb66f-8cd7e22bccbe` (fresh
+homes `render-sp-a6g62nth`, `render-host-eeukcdmk`, `render-guest-twlcy8l6`)
+passes **36/36**. The four checks that failed in the 2026-11-26 triage now have
+pixel evidence: search draws 4415 magenta pixels near gui2 (the exposed
+diamond ore) and 625 green pixels of the enclosed emerald ore's box through
+the wall; the LAN tracers check draws 277 cyan pixels near gui2 (282 at gui1,
+98/103 far); Indicators Hit Only draws 623 red pixels on the hit and 0/0 on
+the 3-aside miss; trajectories-bow-block draws 101 white pixels near gui2.
+The scenario's colour criterion now counts only pixels that are the colour in
+the on frame and not in the off frame (`colour-drawn`), so drifting clouds no
+longer drown the bow arc, and search matches its MSAA blend at tolerance 90.
+The MurderFinder callout also passes now that the overlay runs: the guest
+sends "VapeHost is the murderer!" and the host sees it.

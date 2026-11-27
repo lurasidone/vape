@@ -1,45 +1,28 @@
-// Lines drawn through walls. The client's frame passes its depth-tested lines
-// and then its always-on-top lines to `camera_relative`; the fishing-line hook
-// marks through-wall lines with a negative width. The first call drops them
-// from the depth-tested set, and the next call appends them to the on-top set.
+// Lines drawn through walls. The world-lines hook splits each frame's module
+// lines: the depth-tested ones stay in the fishing line's set, and the
+// through-wall ones (StorageESP, ESP, Tracers, Trajectories, Search,
+// PropHunt, Projectiles) are kept here. The debug-gizmos hook then appends
+// them to the frame's always-on-top gizmo set, which the client draws over
+// everything.
 //
-// Every call also records the frame's real camera (third person and freecam
-// included) and view rotation, which the HUD-time overlay projects with, and
-// a line starting at NaN (Tracers) starts one block in front of that camera.
-use super::Line;
-use core::cell::{Cell, RefCell};
-use core::ops::ControlFlow;
+// This lives in the game crate (the fishing module), not in `gizmos`: the
+// prebuilt game route only mirrors support modules into game-crate files, and
+// a library-crate helper has no way back into the game crate.
+use core::cell::RefCell;
+use horizon_client_lib::gizmos::{Gizmos, Line};
 
 thread_local! {
-    static PENDING: RefCell<Vec<Line>> = const { RefCell::new(Vec::new()) };
-    static CAMERA: Cell<Option<([f64; 3], glam::Mat4)>> = const { Cell::new(None) };
+    static THROUGH: RefCell<Vec<Line>> = const { RefCell::new(Vec::new()) };
 }
 
-/// The camera position and view rotation of the frame being drawn.
-pub fn frame_camera() -> Option<([f64; 3], glam::Mat4)> {
-    CAMERA.with(Cell::get)
+/// Keep this frame's through-wall lines for the on-top gizmo set.
+pub fn stash(lines: Vec<Line>) {
+    THROUGH.with(|t| *t.borrow_mut() = lines);
 }
 
-pub(crate) fn camera_relative(lines: &[Line], camera: [f64; 3], view: glam::Mat4) -> ControlFlow<Vec<[f32; 8]>> {
-    CAMERA.with(|c| c.set(Some((camera, view))));
-    if lines.iter().any(|l| l.width < 0.0) {
-        let (marked, plain): (Vec<Line>, Vec<Line>) = lines.iter().copied().partition(|l| l.width < 0.0);
-        let out = super::camera_relative(&plain, camera, view);
-        let forward = view.inverse().transform_vector3(glam::Vec3::NEG_Z).as_dvec3();
-        let centre = [camera[0] + forward.x, camera[1] + forward.y, camera[2] + forward.z];
-        PENDING.with(|p| {
-            *p.borrow_mut() = marked
-                .into_iter()
-                .map(|l| Line { width: -l.width, start: if l.start[0].is_nan() { centre } else { l.start }, ..l })
-                .collect();
-        });
-        return ControlFlow::Break(out);
-    }
-    let pending = PENDING.with(|p| core::mem::take(&mut *p.borrow_mut()));
-    if pending.is_empty() {
-        return ControlFlow::Continue(());
-    }
-    let mut all = lines.to_vec();
-    all.extend(pending);
-    ControlFlow::Break(super::camera_relative(&all, camera, view))
+/// Move this frame's through-wall lines into the gizmos' on-top set.
+pub fn extend(mut gizmos: Gizmos) -> Gizmos {
+    let lines = THROUGH.with(|t| core::mem::take(&mut *t.borrow_mut()));
+    gizmos.on_top.extend(lines);
+    gizmos
 }

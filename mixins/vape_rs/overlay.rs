@@ -85,7 +85,7 @@ fn stack_item(game: &Game<'_>, stack: Option<&horizon_client::items::ItemStack>)
         count: stack.count,
         damage: stack.damage,
         max_damage: max_damage(game, &stack.item),
-        enchanted: stack.has_foil(false),
+        enchanted: stack.has_foil(Some(false)),
     })
 }
 
@@ -326,13 +326,17 @@ fn living(game: &Game<'_>, epoch: crate::game::vape_rs::core::lifecycle::Epoch) 
 
 /// The frame the overlay modules draw from, or `None` outside a world.
 fn frame(
-    game: &Game<'_>,
+    game: &mut Game<'_>,
     batch: &HudBatch,
     epoch: crate::game::vape_rs::core::lifecycle::Epoch,
 ) -> Option<Frame> {
-    let player = game.player.as_ref()?;
-    let (camera, view) = horizon_client_lib::gizmos::vape_on_top::frame_camera()?;
+    game.player.as_ref()?;
     let partial = game.clock.camera_fraction() as f32;
+    // `Camera.update` at this frame's partial tick: the eye or the pulled-in
+    // third-person camera, and the rotation the world pass renders with.
+    let (position, view_yaw, view_pitch) = game.camera_view(partial)?;
+    let camera = position.to_array();
+    let view = horizon_client::camera::view_matrix(view_yaw, view_pitch);
     let fov = game.fov_degrees(partial, camera);
     let aspect = batch.width / batch.height.max(1.0);
     let pose = game.bob_matrix(partial) * game.spinning_matrix(partial);
@@ -378,6 +382,7 @@ fn frame(
     } else {
         Vec::new()
     };
+    let player = game.player.as_ref()?;
     let own = Own {
         health: player.health.health(),
         absorption: player.health.absorption(),
@@ -410,7 +415,7 @@ fn frame(
         projection,
         entities,
         own,
-        first_person: game.camera_type.first_person(),
+        first_person: game.camera_type.is_first_person(),
         now_ms: game.started.elapsed().as_millis() as u64,
     })
 }

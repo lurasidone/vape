@@ -325,22 +325,19 @@ bindings = [
 
 [[module]]
 id = "on-top"
-file = "crates/horizon-client/src/gizmos.rs"
+file = "crates/horizon-client/src/game/fishing.rs"
 name = "vape_on_top"
 source = "on_top.rs"
 visibility = "pub"
 
+# Through-wall world lines: the world-lines hook keeps them aside and this
+# RETURN hook puts them in the frame's always-on-top gizmo set.
 [[injection]]
-id = "on-top-hook"
-target = "horizon_client::gizmos::camera_relative"
-kind = "HEAD"
-cancellable = true
-helper = "adapters/on_top.rs"
-bindings = [
- { name = "lines", ty = "&[Line]", value = "lines" },
- { name = "camera", ty = "[f64; 3]", value = "camera" },
- { name = "view", ty = "glam::Mat4", value = "view" },
-]
+id = "debug-gizmos"
+target = "horizon_client::game::debug_keys::Game<'_>::debug_gizmos"
+kind = "RETURN"
+helper = "adapters/debug_gizmos.rs"
+bindings = [{ name = "gizmos", ty = "Gizmos", value = "$value" }]
 
 [[module]]
 id = "parkour"

@@ -373,6 +373,20 @@ bindings = [
  { name = "size", ty = "[u32; 2]", value = "size" },
 ]
 
+[[native.module]]
+id = "on-top"
+file = "crates/horizon-client/src/game/items/fishing.rs"
+name = "vape_on_top"
+source = "src/on_top.rs"
+visibility = "pub"
+
+[[native.mixin]]
+id = "debug-gizmos-hook"
+target = "horizon_client::game::debug_keys::Game<'_>::debug_gizmos"
+kind = "RETURN"
+helper = "src/adapters/debug_gizmos.rs"
+bindings = [{ name = "gizmos", ty = "Gizmos", value = "$value" }]
+
 
 [[native.module]]
 id = "parkour"
@@ -570,6 +584,22 @@ source = "src/world_actions.rs"
 # InvWalk: the keys physically held behind a screen join the controlled
 # tick's (screen-released) keys; the helper re-dispatches once.
 
+
+[[native.module]]
+id = "overlay"
+file = "crates/horizon-client/src/game/interface/fov.rs"
+name = "vape_overlay"
+source = "src/overlay.rs"
+
+[[native.mixin]]
+id = "overlay-hook"
+target = "horizon_client::game::fov::Game<'_>::draw_spyglass"
+kind = "HEAD"
+helper = "src/adapters/overlay.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+]
 
 [[native.module]]
 id = "remote-tab"
