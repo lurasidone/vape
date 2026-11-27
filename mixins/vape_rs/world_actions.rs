@@ -343,6 +343,54 @@ fn inv_walk_screen(game: &Game<'_>, gui_open: bool, capturing: bool) -> inv_walk
     }
 }
 
+/// InvWalk's options for the screen in front of the world, and the keys
+/// physically held this tick.
+fn inv_walk_state(game: &Game<'_>, gui_open: bool, capturing: bool) -> (Option<inv_walk::Options>, inv_walk::Held) {
+    let client = crate::game::vape_rs::core::client().clone();
+    let screen = inv_walk_screen(game, gui_open, capturing);
+    let options = with_client(&client, |runtime| runtime.inv_walk(screen));
+    let held = inv_walk::Held {
+        forward: physical(game, KeyCode::KeyW),
+        back: physical(game, KeyCode::KeyS),
+        left: physical(game, KeyCode::KeyA),
+        right: physical(game, KeyCode::KeyD),
+        jump: physical(game, KeyCode::Space),
+        sneak: options.is_some_and(|o| o.sneak) && physical(game, KeyCode::ShiftLeft),
+        up: game.physical_keys.contains(&KeyCode::ArrowUp),
+        down: game.physical_keys.contains(&KeyCode::ArrowDown),
+        turn_left: game.physical_keys.contains(&KeyCode::ArrowLeft),
+        turn_right: game.physical_keys.contains(&KeyCode::ArrowRight),
+    };
+    (options, held)
+}
+
+fn inv_walk_keys_of(held: &inv_walk::Held) -> horizon_client::sprint::Keys {
+    horizon_client::sprint::Keys {
+        forward: held.forward,
+        backward: held.back,
+        left: held.left,
+        right: held.right,
+        jump: held.jump,
+        shift: held.sneak,
+        sprint: false,
+        sprint_suppressed: false,
+        analog: None,
+    }
+}
+
+/// The keys InvWalk hands the local player's next controlled tick, when it is
+/// active for the current screen. The game-crate caller merges them into the
+/// tick's screen-released keys; the SDK's move hooks sit in the library crate
+/// and cannot read this module, so a `MODIFY_ARG` on that call asks for them.
+pub fn inv_walk_keys(game: &Game<'_>) -> Option<horizon_client::sprint::Keys> {
+    let client = crate::game::vape_rs::core::client().clone();
+    let (gui_open, capturing) = with_client(&client, |runtime| {
+        (runtime.gui.open, runtime.gui.capturing())
+    });
+    let (options, held) = inv_walk_state(game, gui_open, capturing);
+    options.map(|_| inv_walk_keys_of(&held))
+}
+
 /// The reference's `findActionAtYLevel`: the nearest crystal-base block whose
 /// crystal placement is safe. The scan tries the player's y level, then the
 /// one above, in the two-pass order toward the target.
@@ -1374,35 +1422,12 @@ pub(crate) fn tick(game: &mut Game<'_>) {
     let body = self::body(game);
     scaffold_bridge_tick(game, &client, no_screen, body);
     // InvWalk.
-    let screen = inv_walk_screen(game, gui_open, capturing);
-    let options = with_client(&client, |runtime| runtime.inv_walk(screen));
+    let (options, held) = inv_walk_state(game, gui_open, capturing);
     let keys = options.map(|o| {
-        let held = inv_walk::Held {
-            forward: physical(game, KeyCode::KeyW),
-            back: physical(game, KeyCode::KeyS),
-            left: physical(game, KeyCode::KeyA),
-            right: physical(game, KeyCode::KeyD),
-            jump: physical(game, KeyCode::Space),
-            sneak: o.sneak && physical(game, KeyCode::ShiftLeft),
-            up: game.physical_keys.contains(&KeyCode::ArrowUp),
-            down: game.physical_keys.contains(&KeyCode::ArrowDown),
-            turn_left: game.physical_keys.contains(&KeyCode::ArrowLeft),
-            turn_right: game.physical_keys.contains(&KeyCode::ArrowRight),
-        };
         let (yaw, pitch) = inv_walk::rotate(&o, &held, game.yaw, game.pitch);
         game.yaw = yaw;
         game.pitch = pitch;
-        horizon_client::sprint::Keys {
-            forward: held.forward,
-            backward: held.back,
-            left: held.left,
-            right: held.right,
-            jump: held.jump,
-            shift: held.sneak,
-            sprint: false,
-            sprint_suppressed: false,
-            analog: None,
-        }
+        inv_walk_keys_of(&held)
     });
     if let Some(player) = game.player.as_ref() {
         player.vape_rs_set_inv_walk(keys.filter(|_| !totem_hold));

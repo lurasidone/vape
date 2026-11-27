@@ -167,6 +167,7 @@ impl Gui {
         }
         // Raw window text handles Unicode/keyboard layout. The control socket
         // sends physical key events without text, so provide their ASCII form.
+        eprintln!("VAPE gui.key {key} {action:?} open={} focus={:?} editor={} raw={raw} rules={}", self.open, self.focus, self.editor.is_some(), self.rules_editor.as_ref().map(|e| e.item.clone()));
         if !raw && !control {
             let shift = self.held.contains("ShiftLeft") || self.held.contains("ShiftRight");
             let text = if key.len() == 4 && key.starts_with("Key") {
@@ -189,6 +190,7 @@ impl Gui {
             };
             if let Some(text) = text {
                 self.text(&text);
+                eprintln!("VAPE typed {text:?} -> {:?}", self.rules_editor.as_ref().map(|e| e.item.clone()));
             }
         }
         Vec::new()

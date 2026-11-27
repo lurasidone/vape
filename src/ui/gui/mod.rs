@@ -1110,6 +1110,36 @@ mod tests {
         click(&mut gui, &view, (122.0 + FRAME_WIDTH - 6.0, 16.0));
         assert!(!gui.edit_hidden);
     }
+    /// The socket's `key` command sends physical key codes: the editor's
+    /// field has to take their ASCII form, not only IME text.
+    #[test]
+    fn the_editor_field_takes_physical_key_presses() {
+        let mut gui = Gui {
+            open: true,
+            ..Gui::default()
+        };
+        let mut view = editor_view();
+        // The fifth navigation row (20-high rows after the 22 header) opens
+        // the Inventory category.
+        click(&mut gui, &view, (30.0, 6.0 + NAV_HEADER_HEIGHT + 4.0 * ROW_HEIGHT + 10.0));
+        gui.selected = Some("inventory.inventory-manager".into());
+        gui.frame(&view, (400.0, 300.0));
+        let open = centre(&gui, &|hit| matches!(hit, Hit::RulesOpen));
+        click(&mut gui, &view, open);
+        gui.frame(&view, (400.0, 300.0));
+        let field = centre(
+            &gui,
+            &|hit| matches!(hit, Hit::Focus(f, _) if f == "rules.item"),
+        );
+        click(&mut gui, &view, field);
+        for key in ["KeyD", "KeyI", "KeyA", "KeyM", "KeyO", "KeyN", "KeyD"] {
+            gui.key(key, KeyAction::Press);
+            gui.key(key, KeyAction::Release);
+        }
+        assert_eq!(gui.rules_editor.as_ref().unwrap().item, "diamond");
+        let _ = &mut view;
+    }
+
     #[test]
     fn the_inventory_editor_adds_cycles_and_removes_item_rules() {
         use crate::inventory::rules::{parse_presets, parse_profiles, Filter, Matcher};
