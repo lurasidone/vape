@@ -3256,16 +3256,23 @@ disables, and the player still stands in the enclosure.
 With `--part all` on `native-f1bb66f-492bff3b2224` (`render-sp-orkuhesa`,
 `render-host-djp8ag5z`, `render-guest-epv5dfnd`) 4 of the render checks
 still fail, and their captures say why:
-- search: the highlights draw (two magenta specks beside the stone cube),
-  but the ores sit inside the cube, the check counts whole-frame magenta,
-  and clouds/chat/tutorial toast move between the on and off frames.
+- search: the query parses (`entry` strips `+tracer` before `=`, search.rs)
+  and the module draws its 0xFFFF00FF box and tracer, but the ores sit
+  fully inside the stone cube: only 34 pixels of the diagonal tracer show,
+  all exactly (225,76,250) — a ~0.6-coverage MSAA blend of magenta over
+  sky — so `near(255,0,255)` finds nothing while the off frame has zero.
+  The scene needs an exposed ore and the check a hue/blend-tolerant match.
 - trajectories-bow-block: no arc is drawn for a block target at all (the
   mob and crossbow arcs pass); the 2841 changed pixels are the held bow
   bobbing and drifting clouds.
-- tracers: the guest frame shows the host player with no line; no
-  (0,150,255) pixel exists anywhere in any view.
+- tracers: the guest frame shows the host player with no line; no cyan
+  pixel at all, even at a blend-tolerant window (b>200, 90<g<220, r<150),
+  in any of the four views on or off — the module draws nothing.
 - indicators Hit Only: the capture is 1 tick after the summon, the arrow
-  still 11 blocks behind the player; no red marker in the ring box.
+  still 11 blocks behind the player, so the marker would be off-screen; the
+  ring box holds 0 red pixels on hit and miss (the 796 red-ish pixels in
+  the frame are the red chat text, outside the ring). Needs a
+  front-approaching arrow before calling the module broken.
 
 ## 2026-11-26: HUD detail scenario on the layout model
 The fixed clicks in `tools/hud_detail_scenario.py` were a pin behind: the
