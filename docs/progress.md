@@ -3236,3 +3236,11 @@ reference's activation/action delays and the placement timeout. The crystal
 aura scenario on `native-f1bb66f-492bff3b2224` (fresh home,
 `crystal-aura-hk7ycrxa`) passes 7/7: the crystal is placed, explodes on the
 target (10.0 -> 0.0) and the player survives the blast.
+
+## 2026-11-26: AutoAnchor host loop
+The module resolves the anchor base under the crosshair, switches to a
+respawn anchor, places it and detonates it, then disables itself. The auto
+anchor scenario on `native-f1bb66f-492bff3b2224` (fresh home,
+`auto-anchor-i4fmhib6`) passes 8/8: the anchor is placed (the base reads
+air), detonates with the module finishing disabled, and the player survives
+the blast.
