@@ -7,11 +7,24 @@ thread_local! {
     static SAFE_WALK: Cell<usize> = const { Cell::new(0) };
     static NO_SLOWDOWN: Cell<usize> = const { Cell::new(0) };
     static FLY: Cell<(usize, [f64; 3])> = const { Cell::new((0, [0.0; 3])) };
+    static FLY_BEFORE: Cell<([f64; 3], f64, usize)> =
+        const { Cell::new(([f64::NAN; 3], f64::NAN, 0)) };
     static INV_WALK: Cell<(usize, Option<crate::sprint::Keys>)> = const { Cell::new((0, None)) };
     static SPRINT: Cell<usize> = const { Cell::new(0) };
     static TIMER: Cell<(usize, f32)> = const { Cell::new((0, 1.0)) };
     static TIMER_FRACTION: Cell<(usize, f32)> = const { Cell::new((0, 0.0)) };
     static TIMER_REENTRY: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Fly/Speed/LongJump: the pre-travel position and fall of the local player
+/// for the tick whose vanilla travel the module's move replaces.
+pub(crate) fn vape_rs_set_fly_before(position: [f64; 3], fall_distance: f64, events: usize) {
+    FLY_BEFORE.with(|cell| cell.set((position, fall_distance, events)));
+}
+
+pub(crate) fn vape_rs_take_fly_before() -> Option<([f64; 3], f64, usize)> {
+    let (position, fall_distance, events) = FLY_BEFORE.with(Cell::take);
+    (!position[0].is_nan()).then_some((position, fall_distance, events))
 }
 
 pub trait PlayerMotionExt {

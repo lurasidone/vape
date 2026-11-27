@@ -3213,3 +3213,16 @@ built with `horizon-prepare` from `~/.minecraft` plus the Prism assets index
 scenario's `client.gui.binds` seed is now `ShiftLeft` (the current key name);
 its click coordinates are still the old pin's (the Compass click hits the
 Clock), so the scenario's assertions do not pass yet.
+
+## 2026-11-26: Fly/Speed/LongJump move replacement
+`fly-move-head` (HEAD on `Game::tick_local_player_body`) records the local
+player's position, fall distance and motion-event count; `fly-move-body`
+(AFTER_CALL of `self.seat_own_stands`, after the local tick and before the
+motion packet) puts the vanilla travel's position, fall and events back, then
+runs the module's move through the SDK's `MotionWorld::move_self` and
+re-seats riders. The seat/avatar reads from the vanilla path stay a tick or
+frame behind (the avatar catches up next tick). The movement scenario on
+`native-f1bb66f-492bff3b2224` (fresh home, `movement-rbdat5y2`) passes 50/52:
+the Fly rise/hover/0.5-per-tick checks, Speed Bhop and LongJump pass; the two
+fails are the pre-existing AntiFall bind and lagback checks (a separate
+module, unchanged here).
